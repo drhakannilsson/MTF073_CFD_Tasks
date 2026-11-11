@@ -245,3 +245,7 @@ Ubuntu keeps a fresh copy of the original `.bashrc` file in `/etc/skel`. If your
 ## Next
 
 Now you can continue with [04_The_OpenFOAM_flange_tutorial.md](04_The_OpenFOAM_flange_tutorial.md).
+
+---
+
+© 2026 Håkan Nilsson. Licensed under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/).

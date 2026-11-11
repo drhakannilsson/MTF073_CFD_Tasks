@@ -197,3 +197,7 @@ The standard function objects `probes` (monitored temperatures) and `solverInfo`
 | `meshes.zip` | the prescribed non-equidistant validation meshes of the 40 cases |
 | `Task_1_Reference_results.zip` | the reference results of the course Python code |
 | `Allclean` | removes everything generated |
+
+---
+
+© 2026 Håkan Nilsson. Licensed under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/).

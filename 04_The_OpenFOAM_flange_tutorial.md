@@ -732,3 +732,7 @@ results without restarting.
 ## Next
 
 Now you can continue with [Task_1_01_OpenFOAM_tutorial.md](Task_1_01_OpenFOAM_tutorial.md).
+
+---
+
+© 2026 Håkan Nilsson. Licensed under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/).

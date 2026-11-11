@@ -32,3 +32,9 @@ Get the latest version later with `git pull` in `~/MTF073_CFD_Tasks`.
 ## Task 2 and Task 3
 
 Will be added later.
+
+## License
+
+Copyright © 2026 Håkan Nilsson.
+
+All material in this project (text, images, scripts, case files and data) is licensed under the [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License](https://creativecommons.org/licenses/by-nc-sa/4.0/) (CC BY-NC-SA 4.0). See [LICENSE](LICENSE) for the full license text.

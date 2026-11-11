@@ -98,3 +98,7 @@ ParaView also keeps its settings in the folder `%APPDATA%\ParaView`. You can del
 Now you can continue with [03_Linux_tutorial.md](03_Linux_tutorial.md).
 
 If you already know Linux, you can skip directly to [04_The_OpenFOAM_flange_tutorial.md](04_The_OpenFOAM_flange_tutorial.md).
+
+---
+
+© 2026 Håkan Nilsson. Licensed under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/).

@@ -1111,3 +1111,7 @@ It is compiled the first time the case runs (into `dynamicCode/`, which takes ab
 ## Next
 
 Now you can continue with [Task_1_02_all_cases.md](Task_1_02_all_cases.md).
+
+---
+
+© 2026 Håkan Nilsson. Licensed under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/).

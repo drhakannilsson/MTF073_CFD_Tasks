@@ -61,3 +61,7 @@ In the **Ubuntu** terminal, remove everything that was generated:
 cd ~/MTF073_CFD_Tasks/Task_1_OpenFOAM
 ./Allclean
 ```
+
+---
+
+© 2026 Håkan Nilsson. Licensed under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/).

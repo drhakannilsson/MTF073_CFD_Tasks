@@ -170,3 +170,7 @@ Finally, open *Turn Windows features on or off*, untick *Windows Subsystem for L
 ## Next
 
 Now you can continue with [02_Install_ParaView_Windows.md](02_Install_ParaView_Windows.md).
+
+---
+
+© 2026 Håkan Nilsson. Licensed under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/).
