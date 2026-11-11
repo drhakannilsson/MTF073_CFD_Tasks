@@ -1,0 +1,38 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  MTF073 Task 1 - OpenFOAM base case. Copied and modified by t1foam.py.
+  Placeholders of the form @@...@@ are replaced by t1foam.py.
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fvSolution;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+#include "caseParameters"
+
+// Optimal settings: the matrix is symmetric, so the preconditioned
+// conjugate gradient solver is used, and solved to machine accuracy in each
+// iteration. Linear cases then converge in a single iteration, and
+// nonlinear cases (solution-dependent k or b) in a few iterations.
+// The meshes are orthogonal, so no non-orthogonal correction is needed.
+solvers
+{
+    T
+    {
+        solver          PCG;
+        preconditioner  DIC;
+        tolerance       1e-12;
+        relTol          0;
+        maxIter         1000;
+    }
+}
+
+SIMPLE
+{
+    nNonOrthogonalCorrectors 0;
+}
+
+// ************************************************************************* //

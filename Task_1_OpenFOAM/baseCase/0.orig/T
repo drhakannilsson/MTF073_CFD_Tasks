@@ -1,0 +1,32 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  MTF073 Task 1 - OpenFOAM base case. Copied and modified by t1foam.py.
+  Placeholders of the form @@...@@ are replaced by t1foam.py.
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    location    "0";
+    object      T;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Temperature [K]. Initialized to 0 as in the course code.
+// Spatially varying Dirichlet values are set by setExprBoundaryFields
+// (see system/setExprBoundaryFieldsDict).
+
+dimensions      [0 0 0 1 0 0 0];
+
+internalField   uniform 0;
+
+boundaryField
+{
+@@TBOUNDARY@@
+    frontAndBack
+    {
+        type            empty;
+    }
+}
+
+// ************************************************************************* //

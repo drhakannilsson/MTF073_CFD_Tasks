@@ -1,0 +1,38 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  MTF073 Task 1 - OpenFOAM base case. Copied and modified by t1foam.py.
+  Placeholders of the form @@...@@ are replaced by t1foam.py.
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fvSolution;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+#include "caseParameters"
+
+// Course settings: a fixed number (nLinSolIter) of Gauss-Seidel sweeps in
+// each iteration, as in the Python code. The iterations are stopped by the
+// courseResiduals function object when epsilon < resTol.
+solvers
+{
+    T
+    {
+        solver          smoothSolver;
+        smoother        GaussSeidel;
+        nSweeps         1;
+        tolerance       0;
+        relTol          0;
+        minIter         $nLinSolIter;
+        maxIter         $nLinSolIter;
+    }
+}
+
+SIMPLE
+{
+    nNonOrthogonalCorrectors 0;
+}
+
+// ************************************************************************* //

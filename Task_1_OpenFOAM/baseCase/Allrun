@@ -1,0 +1,26 @@
+#!/bin/sh
+cd "${0%/*}" || exit 1                          # Run from this directory
+. ${WM_PROJECT_DIR:?}/bin/tools/RunFunctions    # Tutorial run functions
+#------------------------------------------------------------------------------
+# MTF073 Task 1, @@CASENAME@@
+# The mesh (constant/polyMesh) was written by npzToFoam.py when the case was
+# set up by t1foam.py.
+
+restore0Dir
+
+runApplication checkMesh
+
+# Dirichlet temperature profiles and conductivity at the boundary faces
+runApplication setExprBoundaryFields
+
+# Initial conductivity in the cells
+runApplication setExprFields
+
+# Solve. The coded parts (fvOptions, boundary conditions, function objects)
+# are compiled the first time, into the dynamicCode directory.
+runApplication $(getApplication)
+
+# Cell centre and boundary face centre coordinates, for post-processing
+runApplication postProcess -func writeCellCentres -latestTime
+
+#------------------------------------------------------------------------------

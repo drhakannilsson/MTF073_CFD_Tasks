@@ -1,0 +1,28 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  MTF073 Task 1 - OpenFOAM base case. Copied and modified by t1foam.py.
+  Placeholders of the form @@...@@ are replaced by t1foam.py.
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      probes;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Temperature monitored in the cells that contain these points.
+probes
+{
+    type            probes;
+    libs            (sampling);
+    fields          (T);
+    executeControl  timeStep;
+    writeControl    timeStep;
+    probeLocations
+    (
+@@PROBELOCATIONS@@
+    );
+}
+
+// ************************************************************************* //

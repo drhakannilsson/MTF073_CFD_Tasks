@@ -1,0 +1,32 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  MTF073 Task 1 - OpenFOAM base case. Copied and modified by t1foam.py.
+  Placeholders of the form @@...@@ are replaced by t1foam.py.
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    location    "0";
+    object      DT;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Conductivity k. Initialized by setExprFields and setExprBoundaryFields
+// using the initial temperature, and then updated in every iteration by the
+// caseProperties fvOption (see system/fvOptions).
+
+dimensions      [0 2 -1 0 0 0 0];
+
+internalField   uniform 1;
+
+boundaryField
+{
+@@DTBOUNDARY@@
+    frontAndBack
+    {
+        type            empty;
+    }
+}
+
+// ************************************************************************* //

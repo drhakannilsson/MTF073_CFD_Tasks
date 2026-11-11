@@ -1,0 +1,28 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  MTF073 Task 1 - OpenFOAM base case. Copied and modified by t1foam.py.
+  Placeholders of the form @@...@@ are replaced by t1foam.py.
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      caseParameters;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Parameters of this case. Included by the other dictionaries.
+// You may change resTol, nLinSolIter and maxIter here and rerun ./Allrun.
+
+caseID          @@CASEID@@;
+L               @@L@@;              // Domain length [m]
+H               @@H@@;              // Domain height [m]
+
+resTol          @@RESTOL@@;         // Stop when the course residual epsilon < resTol
+nLinSolIter     @@NLINSOLITER@@;    // Gauss-Seidel sweeps per iteration (course settings)
+maxIter         @@MAXITER@@;        // Maximum number of iterations
+
+// Case description (for information only):
+@@DESCRIPTION@@
+
+// ************************************************************************* //

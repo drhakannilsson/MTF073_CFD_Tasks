@@ -1,0 +1,204 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  MTF073 Task 1 - OpenFOAM base case. Copied and modified by t1foam.py.
+  Placeholders of the form @@...@@ are replaced by t1foam.py.
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      courseResiduals;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Course-style convergence monitoring (same for all cases), executed after
+// each iteration:
+//
+//  - epsilon = sum over all cells |aP TP - (aE TE + aW TW + aN TN + aS TS + Su)| / F
+//    computed from the assembled OpenFOAM matrix for the latest temperature
+//    (fvMatrix::residual()), where F = Din + Sin is the total heat rate INTO
+//    the domain (diffusion through the boundaries, and positive source).
+//  - Heat rates through the four boundaries and from the source term, and
+//    the global imbalance |Din - Dout + Sin - Sout|/F.
+//  - Stops the simulation (and writes the results) when epsilon < resTol.
+//  - Creates the fields q = -k grad(T) (heat flux vector in the cells) and
+//    qWall = -k dT/dn at the boundary faces (wall-normal heat flux out of the
+//    domain, from the temperature gradient just inside the boundary).
+//
+// All heat rates are per unit depth (divided by the mesh thickness).
+// Written to the log file and to postProcessing/courseResiduals.dat.
+
+courseResiduals
+{
+    type            coded;
+    libs            (utilityFunctionObjects);
+    name            courseResiduals;
+    executeControl  timeStep;
+    executeInterval 1;
+    writeControl    writeTime;
+
+    // Convergence tolerance (from caseParameters)
+    resTol          $resTol;
+
+    codeInclude
+    #{
+        #include "fvCFD.H"
+        #include "fvOptions.H"
+        #include "OFstream.H"
+        #include "emptyFvPatch.H"
+    #};
+
+    codeOptions
+    #{
+        -I$(LIB_SRC)/finiteVolume/lnInclude \
+        -I$(LIB_SRC)/meshTools/lnInclude
+    #};
+
+    codeLibs
+    #{
+        -lfiniteVolume \
+        -lmeshTools
+    #};
+
+    codeData
+    #{
+        scalar resTol_;
+        autoPtr<OFstream> datFilePtr_;
+        autoPtr<volVectorField> qPtr_;
+        autoPtr<volScalarField> qWallPtr_;
+    #};
+
+    codeRead
+    #{
+        resTol_ = dict.get<scalar>("resTol");
+    #};
+
+    codeExecute
+    #{
+        const scalar resTol = resTol_;
+        const fvMesh& mesh = this->mesh();
+        const Time& runTime = mesh.time();
+
+        volScalarField& T =
+            const_cast<volScalarField&>(mesh.lookupObject<volScalarField>("T"));
+        const volScalarField& DT = mesh.lookupObject<volScalarField>("DT");
+
+        // Thickness of the 2D mesh, to get values per unit depth
+        const scalar depth = mesh.bounds().span().z();
+
+        // Source term matrix (b = Su + Sp*T) from fvOptions,
+        // and the full discretized equation
+        fv::options& fvOptions = fv::options::New(mesh);
+        tmp<fvScalarMatrix> tSource = fvOptions(T);
+        fvScalarMatrix& source = tSource.ref();
+        fvScalarMatrix TEqn(-fvm::laplacian(DT, T));
+        TEqn -= source;
+
+        // Sum of absolute residuals over all cells
+        const scalar r0 = sum(mag(TEqn.residual()))/depth;
+
+        // Source heat rate in each cell: b*V = Sp*T*V + Su*V
+        const scalarField bV
+        (
+            (source.diag()*T.primitiveField() - source.source())/depth
+        );
+        const scalar Sin = sum(max(bV, scalar(0)));
+        const scalar Sout = -sum(min(bV, scalar(0)));
+
+        // Diffusive heat rates through the boundaries (into domain > 0)
+        // Boundary numbers: 1 = south, 2 = east, 3 = north, 4 = west
+        scalar Din = 0, Dout = 0;
+        scalarList Qb(5, Zero);
+        forAll(mesh.boundary(), patchi)
+        {
+            const fvPatch& p = mesh.boundary()[patchi];
+            if (isA<emptyFvPatch>(p)) continue;
+            const scalarField q
+            (
+                DT.boundaryField()[patchi]*T.boundaryField()[patchi].snGrad()
+               *p.magSf()/depth
+            );
+            Din += sum(max(q, scalar(0)));
+            Dout -= sum(min(q, scalar(0)));
+            const word& n = p.name();
+            const label b =
+                n.find("south") == 0 ? 1
+              : n.find("east") == 0 ? 2
+              : n.find("north") == 0 ? 3
+              : n.find("west") == 0 ? 4 : 0;
+            Qb[b] += sum(q);
+        }
+
+        const scalar F = Din + Sin;
+        const scalar eps = r0/max(F, VSMALL);
+        const scalar imbalance = mag(Din - Dout + Sin - Sout)/max(F, VSMALL);
+
+        Info<< "courseResiduals: iteration " << runTime.timeIndex()
+            << " epsilon = " << eps << " F = " << F
+            << " globalImbalance = " << imbalance << nl
+            << "courseResiduals: heatRates(into domain) boundary1 = " << Qb[1]
+            << " boundary2 = " << Qb[2] << " boundary3 = " << Qb[3]
+            << " boundary4 = " << Qb[4] << " source = " << sum(bV) << nl;
+
+        if (!datFilePtr_)
+        {
+            mkDir(runTime.path()/"postProcessing");
+            datFilePtr_.reset
+            (
+                new OFstream(runTime.path()/"postProcessing"/"courseResiduals.dat")
+            );
+            datFilePtr_() << "# iteration epsilon F Din Dout Sin Sout globalImbalance "
+                << "Q1 Q2 Q3 Q4 Qsource" << nl;
+        }
+        datFilePtr_().precision(12);
+        datFilePtr_() << runTime.timeIndex() << ' ' << eps << ' ' << F << ' '
+            << Din << ' ' << Dout << ' ' << Sin << ' ' << Sout << ' '
+            << imbalance << ' ' << Qb[1] << ' ' << Qb[2] << ' ' << Qb[3] << ' '
+            << Qb[4] << ' ' << sum(bV) << endl;
+
+        // Heat flux fields, written together with T
+        if (!qPtr_)
+        {
+            qPtr_.reset
+            (
+                new volVectorField
+                (
+                    IOobject("q", runTime.timeName(), mesh,
+                        IOobject::NO_READ, IOobject::AUTO_WRITE),
+                    mesh,
+                    dimensionedVector(dimless, Zero)
+                )
+            );
+            qWallPtr_.reset
+            (
+                new volScalarField
+                (
+                    IOobject("qWall", runTime.timeName(), mesh,
+                        IOobject::NO_READ, IOobject::AUTO_WRITE),
+                    mesh,
+                    dimensionedScalar(dimless, Zero)
+                )
+            );
+        }
+        volVectorField& q = qPtr_();
+        q.primitiveFieldRef() = -DT.primitiveField()*fvc::grad(T)().primitiveField();
+        q.correctBoundaryConditions();
+        volScalarField& qWall = qWallPtr_();
+        forAll(qWall.boundaryField(), patchi)
+        {
+            if (isA<emptyFvPatch>(mesh.boundary()[patchi])) continue;
+            qWall.boundaryFieldRef()[patchi] =
+                -DT.boundaryField()[patchi]*T.boundaryField()[patchi].snGrad();
+        }
+
+        // Convergence criterion of the course
+        if (eps < resTol)
+        {
+            Info<< "courseResiduals: converged, epsilon = " << eps
+                << " < resTol = " << resTol << nl << endl;
+            const_cast<Time&>(runTime).writeAndEnd();
+        }
+    #};
+}
+
+// ************************************************************************* //

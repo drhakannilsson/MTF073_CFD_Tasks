@@ -1,0 +1,58 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  MTF073 Task 1 - OpenFOAM base case. Copied and modified by t1foam.py.
+  Placeholders of the form @@...@@ are replaced by t1foam.py.
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+#include "caseParameters"
+
+application     laplacianFoam;
+
+// Steady-state problem: "time" is the iteration counter
+startFrom       startTime;
+startTime       0;
+stopAt          endTime;
+endTime         $maxIter;
+deltaT          1;
+
+// Results are written when the course residual is below resTol
+// (see system/courseResiduals) or at maxIter.
+writeControl    timeStep;
+writeInterval   $maxIter;
+purgeWrite      0;
+writeFormat     ascii;
+writePrecision  12;
+writeCompression off;
+timeFormat      general;
+timePrecision   8;
+runTimeModifiable false;
+
+functions
+{
+    // Course-style normalized residual, heat rates, global imbalance,
+    // heat flux fields, and the convergence criterion epsilon < resTol
+    #include "courseResiduals"
+
+    // Monitored temperatures
+    #include "probes"
+
+    // OpenFOAM's own residuals (for comparison with the course residual)
+    solverInfo
+    {
+        type            solverInfo;
+        libs            (utilityFunctionObjects);
+        fields          (T);
+        writeResidualFields no;
+        executeControl  timeStep;
+        writeControl    timeStep;
+    }
+}
+
+// ************************************************************************* //

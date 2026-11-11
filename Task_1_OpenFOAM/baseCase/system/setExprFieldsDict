@@ -1,0 +1,31 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  MTF073 Task 1 - OpenFOAM base case. Copied and modified by t1foam.py.
+  Placeholders of the form @@...@@ are replaced by t1foam.py.
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      setExprFieldsDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Sets the initial conductivity in the cells, from the initial temperature.
+
+#include "caseParameters"
+
+readFields      (T);
+
+expressions
+(
+    DT
+    {
+        field       DT;
+        variables   (@@EXPRVARIABLES@@);
+        expression  #{ @@KEXPR@@ #};
+        dimensions  [0 2 -1 0 0 0 0];
+    }
+);
+
+// ************************************************************************* //

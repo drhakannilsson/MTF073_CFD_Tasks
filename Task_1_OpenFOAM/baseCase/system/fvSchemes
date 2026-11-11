@@ -1,0 +1,51 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  MTF073 Task 1 - OpenFOAM base case. Copied and modified by t1foam.py.
+  Placeholders of the form @@...@@ are replaced by t1foam.py.
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fvSchemes;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// The equation is steady: ddt(T) is switched off.
+ddtSchemes
+{
+    default         steadyState;
+}
+
+// Used for the heat flux q = -k grad(T) (post-processing only)
+gradSchemes
+{
+    default         Gauss linear;
+}
+
+divSchemes
+{
+    default         none;
+}
+
+// Central differencing of the face gradient. The face conductivity is
+// linearly interpolated between the cell centres (non-equidistant
+// weights), as in the course code. Try "harmonic" instead of "linear"
+// for the region-dependent conductivity (cases 6-10, 26-30):
+//     default  Gauss harmonic @@SNGRAD@@;
+laplacianSchemes
+{
+    default         Gauss linear @@SNGRAD@@;
+}
+
+interpolationSchemes
+{
+    default         linear;
+}
+
+snGradSchemes
+{
+    default         @@SNGRAD@@;
+}
+
+// ************************************************************************* //

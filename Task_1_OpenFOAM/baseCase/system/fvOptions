@@ -1,0 +1,94 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  MTF073 Task 1 - OpenFOAM base case. Copied and modified by t1foam.py.
+  Placeholders of the form @@...@@ are replaced by t1foam.py.
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fvOptions;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Case-dependent material properties and source term, compiled at run time.
+//
+// laplacianFoam solves  ddt(T) - laplacian(DT, T) = fvOptions(T),
+// where ddt(T) = 0 (steadyState, see fvSchemes). With DT = k and
+// fvOptions(T) = b this is the steady heat conduction equation
+//     d/dx(k dT/dx) + d/dy(k dT/dy) + b = 0.
+// (OpenFOAM formally gives DT the unit m^2/s, and b the unit K/s. Here they
+// are simply used as numbers, so that k is in W/(m K) and b in W/m^3.)
+
+#include "caseParameters"
+
+caseProperties
+{
+    type            scalarCodedSource;
+    name            caseProperties;
+    selectionMode   all;
+    fields          (T);
+
+    // Conductivity k, stored in the field DT used by laplacianFoam.
+    // Called after each solution of the temperature equation, so k is
+    // evaluated with the latest temperature (in cells and boundary faces).
+    codeCorrect
+    #{
+        @@CONSTANTS@@
+        volScalarField& DT =
+            const_cast<volScalarField&>(mesh_.lookupObject<volScalarField>("DT"));
+        const volVectorField& C = mesh_.C();
+
+        // Cell values
+        forAll(DT, celli)
+        {
+            const scalar x = C[celli].x();
+            const scalar y = C[celli].y();
+            const scalar T = fld[celli];
+            (void)x; (void)y; (void)T;
+            DT[celli] = @@KCODE@@;
+        }
+
+        // Boundary face values
+        volScalarField::Boundary& DTbf = DT.boundaryFieldRef();
+        forAll(DTbf, patchi)
+        {
+            const vectorField& Cf = C.boundaryField()[patchi];
+            const scalarField& Tb = fld.boundaryField()[patchi];
+            forAll(DTbf[patchi], facei)
+            {
+                const scalar x = Cf[facei].x();
+                const scalar y = Cf[facei].y();
+                const scalar T = Tb[facei];
+                (void)x; (void)y; (void)T;
+                DTbf[patchi][facei] = @@KCODE@@;
+            }
+        }
+    #};
+
+    // Source term b, linearized as b = Su + Sp*T (Sp <= 0) around the
+    // latest temperature, and added implicitly to the equation:
+    // Su goes to the right-hand side and -Sp to the diagonal.
+    codeAddSup
+    #{
+        @@CONSTANTS@@
+        const scalarField& V = mesh_.V();
+        const scalarField& Tc = eqn.psi().primitiveField();
+        scalarField& diag = eqn.diag();
+        scalarField& source = eqn.source();
+        forAll(V, celli)
+        {
+            const scalar T = Tc[celli];
+            (void)T;
+            @@SOURCECODE@@
+            diag[celli] += Sp*V[celli];
+            source[celli] -= Su*V[celli];
+        }
+    #};
+
+    codeConstrain
+    #{
+    #};
+}
+
+// ************************************************************************* //
