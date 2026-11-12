@@ -6,6 +6,8 @@ This project contains OpenFOAM tutorials for the three computer tasks of the cou
 
 Go through the files in the order of their numbers.
 
+It is easiest to read the `.md` files on GitHub, at https://github.com/drhakannilsson/MTF073_CFD_Tasks, where they are shown with formatting, tables and images.
+
 ## Get the files
 
 In the Ubuntu terminal (see [01_Install_OpenFOAM-v2606_WSL.md](01_Install_OpenFOAM-v2606_WSL.md)), download the whole project to your home directory:
