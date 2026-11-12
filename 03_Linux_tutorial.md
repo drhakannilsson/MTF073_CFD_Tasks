@@ -5,8 +5,9 @@ You don't need this tutorial to follow the rest of the instructions, but it help
 To follow the tutorial, type the commands in the left column into a terminal window. Type each command on a single line, even if it is shown on multiple lines here. Some rows have several commands, separated by `;`. You can type them on a single line, or one at a time. Read the description in the right column. It is in some cases important that the commands are entered in the exact order they are listed. When you are familiar with Linux commands you should be able to practice them in any order.
 
 Useful keys in the terminal window:
-- Copy and paste with Ctrl-Shift-C and Ctrl-Shift-V.
+- Copy and paste with Ctrl-Shift-C and Ctrl-Shift-V. It may also work to paste with the right mouse button.
 - Stop the running command with Ctrl-C (this is why copy is Ctrl-Shift-C).
+- Press Tab while typing a command, file name or directory name to complete it. If nothing happens, press Tab twice to see all alternatives.
 - Go through earlier commands with the ↑ and ↓ arrow keys.
 - Search for an earlier command with Ctrl-R, and type some characters of it. Press Ctrl-R again to go to older commands containing the same characters. Press Enter to run the command, or the → arrow key to edit it first. Press Ctrl-C to cancel.
 
@@ -44,7 +45,6 @@ Please let me know if you find any errors or have any suggestions.
 | `cd ../../..` | Move up three directory levels (you should now be in the `linuxTutorial` directory, check with `pwd`) |
 | `pushd aSecondDirectory/aThirdDirectory/aFourthDirectory` | Go directly to the directory named `aFourthDirectory`, but remember where you came from |
 | `popd` | Go back to where you came from using the previous `pushd` command |
-| `cd -` | Go back to where you last came from. This is good if you want to move back and forth between two directories. Every time you type the command, you will go to the other directory. Type `cd -` again to go back to `linuxTutorial` (check with `pwd`). |
 | `sudo apt install tree` | Install the `tree` command, which is used below. You are asked for your Ubuntu password. |
 | `tree -L 3` | Print out the directory structure in the terminal window |
 | `tree -L 2` | Print out only two levels of the directory structure |
@@ -53,6 +53,7 @@ Please let me know if you find any errors or have any suggestions.
 | `head myFile.txt` | View the beginning of `myFile.txt` (in this case it shows all of the file since it is small). |
 | `tail myFile.txt` | View the end of `myFile.txt` (in this case it shows all of the file since it is small). |
 | `tail -f myFile.txt` | View the end of a file and update when lines are added to the file. Exit with CTRL-C. |
+| CTRL-C | Stop the `tail -f` command and get back to the prompt |
 | `grep "second text line" myFile.txt` | Search for the string "second text line" in `myFile.txt`, and print out all lines that match |
 | `grep -r "first text line" aSecondDirectory` | Search for the string "first text line" recursively in the directory named `aSecondDirectory` |
 | `find aSecondDirectory -iname "*yfi*"` | Find all files that have the string `yfi` in their file name. The string is not case sensitive because we use the flag `-iname`. The `*` means "any string". The command is recursive. |
@@ -82,6 +83,8 @@ A process is a piece of code that is running. There are always processes running
 | `top` | Show the activity of all the processes on the computer. The first number on each line is the process id (PID). Exit by typing `q`. |
 | `kill <PID>` | Kill a job in background. Find the process id (PID) from the `ps` command, or the `top` command. |
 | `kill -9 <PID>` | If the `kill` command doesn't work, try to add the `-9` flag, which should force the kill. |
+| `fg` | Put a process in background back in foreground. Do this if the `sleep` process is still alive. If there is no job in background, it returns `-bash: fg: current: no such job`. |
+| CTRL-C | Kill the `sleep` process, now in foreground |
 | `which sleep` | Print the full path to the `sleep` executable, so that you can check that you are running the file you think that you are running. |
 | `sle<TAB>` | The TAB key also works for finding executables that start with some string. |
 
@@ -94,11 +97,19 @@ Environment variables can be set to different values in each terminal window, fo
 | `env` | List the currently available environment variables, such as `HOME` |
 | `echo $HOME` | Print to the terminal window the value of the environment variable named `HOME`, which is set up automatically as the path to the home directory (unless you have changed it). Note that the character `$` is only used to say that you want the system to expand the environment variable before executing the command. |
 | `echo $PWD` | Print to the terminal window the value of the environment variable `PWD`, which automatically has the path to the current directory. |
-| `echo $PATH` | Print to the terminal window the value of the environment variable `PATH`, which keeps a colon-separated list of paths where the system should look for the executables of the commands that you type in the terminal window.<br>The command `which ls` returns `/usr/bin/ls`, which shows the full path to the file that is executed when you type the command `ls`. The path `/usr/bin` can only be found if it is in the list of paths given in the `PATH` environment variable. In most/all cases the current directory is not listed in the path, which means that an executable that is located in the current directory can not be found if you try to execute it by typing its name. As an example we can copy the `ls` command to our current directory:<br>&nbsp;&nbsp;`cp /usr/bin/ls myLs`<br>Trying to execute it by typing `myLs` will fail, although you know that the executable is in the exact directory where you are located! This can be annoying if you do not know why. The command `myLs` can not be found in any of the directories listed in the environment variable `PATH`, so the system will not find it. You can still run commands that can't automatically be found, by giving the exact path:<br>&nbsp;&nbsp;`./myLs`<br>The dot refers to the current directory. You know that the `PWD` environment variable keeps the path to the current directory, so you can also type:<br>&nbsp;&nbsp;`$PWD/myLs`<br>Note here that I do not have to know in which directory you executed the previous command. In particular, it is most common to work in your home directory. The path to that directory contains your user name, so it is different for users with different user names. The `PWD` environment variable will adapt to that, so that I do not have to bother about differences in user names. The use of environment variables thus makes things more general. |
+| `echo $PATH` | Print to the terminal window the value of the environment variable `PATH`, which keeps a colon-separated list of paths where the system looks for the executables of the commands that you type in the terminal window. |
+| `which ls` | Print the full path to the file that is executed when you type `ls`, i.e., `/usr/bin/ls`. It can only be found since `/usr/bin` is in the list of paths in `PATH`. |
+| `cp /usr/bin/ls myLs` | Copy the `ls` command to the current directory, with the name `myLs`. |
+| `myLs` | Fails with `myLs: command not found`, although the executable is in the current directory. The current directory is not listed in `PATH`, so the system does not find it. |
+| `./myLs` | Run `myLs` by giving the exact path. The dot refers to the current directory. |
+| `$PWD/myLs` | Also runs `myLs`, since `PWD` keeps the path to the current directory. The path is different for users with different user names, but `PWD` adapts to that. The use of environment variables thus makes things more general. |
+| `export PATH=$PATH:.` | Add the current directory to the environment variable `PATH`. Note here that `$PATH` will first expand the current contents of the environment variable `PATH`. Then we add `:.` to it. |
+| `myLs` | Now the system finds `myLs` without giving the full path. |
+| `rm myLs` | Clean up by removing your copy of the `ls` command. |
+| `export PATH=${PATH%:.}` | Remove the `:.` that you added at the end of `PATH`. Check with `echo $PATH`. |
 | `export myEnvironmentVariable="valueOfMyEnvironmentVariable"` | Set the value of the environment variable named `myEnvironmentVariable` to `valueOfMyEnvironmentVariable`. |
 | `echo $myEnvironmentVariable` | Print to the terminal window the value of the environment variable named `myEnvironmentVariable`, which you just assigned the value to. |
-| `export PATH=$PATH:.` | Add the current directory to the environment variable `PATH`. Note here that `$PATH` will first expand the current contents of the environment variable `PATH`. Then we add `:.` to it. If you now try the above exercise with the `myLs` command, the system will find it without giving the full path. |
-| `rm myLs` | Clean up by removing your copy of the `ls` command. |
+| `unset myEnvironmentVariable` | Remove the environment variable named `myEnvironmentVariable`. Check with `echo $myEnvironmentVariable`, which now prints an empty line. |
 | `cd $HOME` | Go to the directory that corresponds to the value of the environment variable named `HOME`, which is the path to the home directory (unless you have changed it). |
 
 Aliases are used to define a name of a command, or group of commands. The alias can be used to execute that command or group of commands, without having to type the original command or group of commands.
@@ -106,7 +117,9 @@ Aliases are used to define a name of a command, or group of commands. The alias 
 | Command | Description |
 |---|---|
 | `alias` | List the currently available aliases, which you can use as "commands" in the terminal window. |
-| `alias goHome='echo "Going to home directory"; cd $HOME'` | Define a new alias named `goHome`, and when used it will write the string "Going to home directory" to the terminal window and execute the command `cd $HOME`. Note here that it is important to use different quotation marks for the entire command after the `=` sign, and the string inside that command.<br>Test by typing:<br>&nbsp;&nbsp;`goHome` |
+| `alias goHome='echo "Going to home directory"; cd $HOME'` | Define a new alias named `goHome`, and when used it will write the string "Going to home directory" to the terminal window and execute the command `cd $HOME`. Note here that it is important to use different quotation marks for the entire command after the `=` sign, and the string inside that command. |
+| `goHome` | Run the alias. It writes "Going to home directory" and moves you to your home directory (check with `pwd`). |
+| `unalias goHome` | Remove the alias named `goHome`. Typing `goHome` now gives `goHome: command not found`. |
 
 ## The bash shell and the ~/.bashrc file
 
@@ -117,7 +130,17 @@ The "shell" is the program that takes the command that you type in the terminal 
 | Command | Description |
 |---|---|
 | `echo $0` | Print the shell name to the terminal window. |
-| `bash` | Start a new bash shell inside the current one. Type `exit` to go back to the original shell. |
+| `echo $SHLVL` | Print the shell level, i.e., how many shells are started inside each other. |
+| `myShellVariable="only in original shell"` | Set a variable without `export`. It is only known in the current shell. |
+| `export myExportedVariable="also in new shell"` | Set a variable with `export`. It is also passed on to new shells that are started from the current one. |
+| `bash` | Start a new bash shell inside the current one. |
+| `echo $SHLVL` | The shell level is now one higher, since you are in the new shell. |
+| `echo $myShellVariable` | Prints an empty line, since a variable set without `export` is not passed on to the new shell. |
+| `echo $myExportedVariable` | Prints `also in new shell`, since the variable was set with `export`. |
+| `exit` | Exit the new bash shell and go back to the original one. |
+| `echo $SHLVL` | The shell level is back to the original value. |
+| `echo $myShellVariable` | Prints `only in original shell` again, since you are back in the original shell. |
+| `unset myShellVariable myExportedVariable` | Remove both variables. |
 
 ### Scripts
 
