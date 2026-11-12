@@ -576,7 +576,17 @@ Each file has two columns separated by a tab: the time and the value, e.g. `logs
 `foamLog -list log.laplacianFoam` lists all variables that can be extracted.
 
 These are plain text files, so you can import them into any program for plotting,
-e.g. Python (NumPy and Matplotlib), Matlab, gnuplot or a spreadsheet. In Python:
+e.g. Python (NumPy and Matplotlib), Matlab, gnuplot or a spreadsheet.
+
+To plot in Python, first install NumPy and Matplotlib (only needed once):
+```sh
+sudo apt install python3-numpy python3-matplotlib
+```
+In the case directory, create a file named `plotLogs.py`:
+```sh
+nano plotLogs.py
+```
+Paste this into it, save with Ctrl+O and Enter, and exit with Ctrl+X:
 ```python
 import numpy as np
 import matplotlib.pyplot as plt
@@ -589,6 +599,12 @@ plt.ylabel('Initial residual of T')
 plt.legend()
 plt.show()
 ```
+Run it in the case directory:
+```sh
+python3 plotLogs.py
+```
+The plot opens in a new window. Close the window to get back to the prompt.
+
 Run `foamLog` again after a new run. It overwrites the files in `logs/`.
 
 
@@ -619,8 +635,8 @@ between versions.
    - *Mesh Regions* selects what is read: `internalMesh` (the cells) and, if you tick
      them, the patches (`patch/patch1`, … or `patch1`, …, depending on the reader).
    - *Cell Arrays* selects the fields (`T`, `gradTx`, `flux`, …).
-   - *Create cell-to-point filtered data* creates point data (see below). Tick it. It
-     is not ticked by default in ParaView 6.2.
+   - *Create cell-to-point filtered data* creates point data (see below). Tick it, and
+     click **Apply**. It is not ticked by default in ParaView 6.2.
 3. **Colour by T.** In the toolbar, change the colouring from *Solid Color* to **T**.
 4. **Change the time.** Use the time controls in the toolbar: first, previous, play,
    next, last, and the time field. Go to the last time (3).
