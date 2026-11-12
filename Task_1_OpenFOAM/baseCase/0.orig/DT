@@ -12,9 +12,11 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-// Conductivity k. Initialized by setExprFields and setExprBoundaryFields
-// using the initial temperature, and then updated in every iteration by the
-// caseProperties fvOption (see system/fvOptions).
+// Conductivity k. The boundary values are set by the boundary conditions,
+// from the boundary temperature. The cell values are set by setExprFields
+// before the simulation starts (system/setExprFieldsDict), and updated
+// after each iteration by the function object conductivity
+// (system/controlDict). internalField is only a placeholder.
 
 dimensions      [0 2 -1 0 0 0 0];
 

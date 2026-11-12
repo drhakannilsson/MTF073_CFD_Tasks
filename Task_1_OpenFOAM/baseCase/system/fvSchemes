@@ -28,14 +28,12 @@ divSchemes
     default         none;
 }
 
-// Central differencing of the face gradient. The face conductivity is
-// linearly interpolated between the cell centres (non-equidistant
-// weights), as in the course code. Try "harmonic" instead of "linear"
-// for the region-dependent conductivity (cases 6-10, 26-30):
-//     default  Gauss harmonic @@SNGRAD@@;
+// The face conductivity is linearly interpolated between the cell centres
+// (non-equidistant weights), as in the course code. The face gradient is
+// (T_N - T_P)/|d|. "orthogonal" is used because the meshes are orthogonal.
 laplacianSchemes
 {
-    default         Gauss linear @@SNGRAD@@;
+    default         Gauss linear orthogonal;
 }
 
 interpolationSchemes
@@ -45,7 +43,7 @@ interpolationSchemes
 
 snGradSchemes
 {
-    default         @@SNGRAD@@;
+    default         orthogonal;
 }
 
 // ************************************************************************* //

@@ -15,6 +15,10 @@ FoamFile
 
 application     laplacianFoam;
 
+// Library with the boundary condition externalWallHeatFluxTemperature
+// (convective boundaries, see 0.orig/T)
+libs            (thermoTools);
+
 // Steady-state problem: "time" is the iteration counter
 startFrom       startTime;
 startTime       0;
@@ -36,6 +40,20 @@ runTimeModifiable false;
 
 functions
 {
+    // Conductivity k (the field DT) in the cells, updated from the latest
+    // temperature after each iteration (Picard iteration). The boundary
+    // values are updated by the boundary conditions in 0.orig/DT.
+    conductivity
+    {
+        type            exprField;
+        libs            (fieldFunctionObjects);
+        field           DT;
+        action          modify;
+        variables       (@@EXPRVARIABLES@@);
+        expression      "@@KEXPR@@";
+        writeControl    writeTime;
+    }
+
     // Course-style normalized residual, heat rates, global imbalance,
     // heat flux fields, and the convergence criterion epsilon < resTol
     #include "courseResiduals"

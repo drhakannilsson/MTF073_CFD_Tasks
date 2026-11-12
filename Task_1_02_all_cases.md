@@ -1,6 +1,6 @@
 # Run all Task 1 cases in OpenFOAM
 
-The folder `Task_1_OpenFOAM` contains scripts that set up, run and post-process the 40 cases of Task 1 in OpenFOAM. All cases are created from a single base case, as described in [Task_1_01_OpenFOAM_tutorial.md](Task_1_01_OpenFOAM_tutorial.md). The results are shown as figures and numbers in the same order as in the Task 1 report template, so that you can compare them with the results of your own Python code.
+The folder `Task_1_OpenFOAM` contains scripts that set up, run and post-process the 40 cases of Task 1 in OpenFOAM. All cases are created from a single base case, set up in the same way as the case in [Task_1_01_OpenFOAM_tutorial.md](Task_1_01_OpenFOAM_tutorial.md). The results are shown as figures and numbers in the same order as in the Task 1 report template, so that you can compare them with the results of your own Python code.
 
 The scripts are described in detail in [Task_1_OpenFOAM/README.md](Task_1_OpenFOAM/README.md). Below are the steps to get started.
 

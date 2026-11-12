@@ -1,0 +1,14 @@
+FoamFile { version 2.0; format ascii; class dictionary; object setExprFieldsDict; }
+
+readFields      (T);
+
+expressions
+(
+    DT
+    {
+        field       DT;
+        variables   ("L = 1.5" "T1 = 10");
+        expression  #{ (pos().x() > 0.7 && pos().x() < 1.1 && pos().y() > 0.3 && pos().y() < 0.4) ? 0.01 : 2*(1 + 10*pos().x()/L + 20*T/T1) #};
+        dimensions  [0 2 -1 0 0 0 0];
+    }
+);

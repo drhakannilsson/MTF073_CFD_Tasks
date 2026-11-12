@@ -19,7 +19,7 @@ meshGenerator.py:
 Cells are numbered i + nx*j (i along x, j along y).
 
 Usage:
-    python3 npzToFoam.py mesh.npz caseDir [--thickness 1.0]
+    python3 npzToFoam.py mesh.npz caseDir [--thickness 0.1]
     python3 npzToFoam.py meshes.zip:meshes/Case_1_nonequi_20x20.npz caseDir
 
 The module is also imported by t1foam.py.
@@ -31,7 +31,7 @@ import zipfile
 
 import numpy as np
 
-DEFAULT_THICKNESS = 1.0
+DEFAULT_THICKNESS = 0.1
 
 
 # ---------------------------------------------------------------------------

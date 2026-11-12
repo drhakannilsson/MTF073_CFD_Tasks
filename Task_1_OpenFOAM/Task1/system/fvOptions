@@ -1,0 +1,32 @@
+FoamFile { version 2.0; format ascii; class dictionary; object fvOptions; }
+
+source
+{
+    type            scalarCodedSource;
+    name            source;
+    selectionMode   all;
+    fields          (T);
+
+    codeAddSup
+    #{
+        const scalar c1 = 20;
+        const scalar c2 = 0.2;
+        const scalarField& V = mesh_.V();
+        const scalarField& T = eqn.psi().primitiveField();
+        scalarField& diag = eqn.diag();
+        scalarField& source = eqn.source();
+        forAll(V, celli)
+        {
+            const scalar Su = 15*c1*V[celli];
+            const scalar Sp = -15*c2*max(T[celli], scalar(0))*V[celli];
+            diag[celli] += Sp;
+            source[celli] -= Su;
+        }
+    #};
+    codeCorrect
+    #{
+    #};
+    codeConstrain
+    #{
+    #};
+}

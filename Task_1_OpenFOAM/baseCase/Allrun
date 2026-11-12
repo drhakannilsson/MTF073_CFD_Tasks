@@ -10,13 +10,10 @@ restore0Dir
 
 runApplication checkMesh
 
-# Dirichlet temperature profiles and conductivity at the boundary faces
-runApplication setExprBoundaryFields
-
 # Initial conductivity in the cells
 runApplication setExprFields
 
-# Solve. The coded parts (fvOptions, boundary conditions, function objects)
+# Solve. The coded parts (fvOptions, courseResiduals)
 # are compiled the first time, into the dynamicCode directory.
 runApplication $(getApplication)
 

@@ -1,149 +1,104 @@
-# Setting up the Task 1 heat-conduction cases in OpenFOAM
+# Setting up a Task 1 case in OpenFOAM
 
-This tutorial shows how to set up the Task 1 cases (2D steady heat conduction with varying conductivity and source terms) in OpenFOAM. It also shows how to get the results asked for in the report. It is written from a pure OpenFOAM point of view: everything is done with OpenFOAM dictionaries, utilities and function objects.
+This tutorial shows, step by step, how to set up, run and post-process a 2D steady heat-conduction case like those of Task 1 in OpenFOAM. Everything is done with OpenFOAM dictionaries, utilities and function objects.
 
-You are assumed to know how to run the `flange` tutorial of `laplacianFoam`
-(`$FOAM_TUTORIALS/basic/laplacianFoam/flange`). You should also know how to set
-constant `fixedValue` and `zeroGradient` boundary conditions. If you are new to
-OpenFOAM, start with [04_The_OpenFOAM_flange_tutorial.md](04_The_OpenFOAM_flange_tutorial.md). The tutorial goes
-through what you need beyond that, in the order you need it:
+The tutorial is quite complex. The Task 1 cases have many features that are uncommon in practice, such as boundary temperatures given by formulas, a conductivity that depends on position, region and temperature, and a temperature-dependent source term. Setting them all up in OpenFOAM therefore gives a quite thorough learning experience.
 
-1. [Steady heat conduction with laplacianFoam](#1-steady-heat-conduction-with-laplacianfoam)
-2. [A 2D mesh with non-equidistant cells](#2-a-2d-mesh-with-non-equidistant-cells)
-3. [Spatially varying temperature (Dirichlet) boundary conditions](#3-spatially-varying-temperature-dirichlet-boundary-conditions)
-4. [Heat-flux (Neumann) boundary conditions](#4-heat-flux-neumann-boundary-conditions)
-5. [Spatially varying conductivity](#5-spatially-varying-conductivity)
-6. [Temperature-dependent conductivity](#6-temperature-dependent-conductivity)
-7. [Source terms, linearized and implicit](#7-source-terms-linearized-and-implicit)
-8. [Convective boundary conditions](#8-convective-boundary-conditions)
-9. [Linear solver and discretization settings](#9-linear-solver-and-discretization-settings)
-10. [Convergence: residuals and stopping the iterations](#10-convergence-residuals-and-stopping-the-iterations)
-11. [Post-processing](#11-post-processing)
-12. [Putting it together: Allrun](#12-putting-it-together-allrun)
+You are assumed to know how to run the `flange` tutorial of `laplacianFoam`. If you are new to OpenFOAM, start with [04_The_OpenFOAM_flange_tutorial.md](04_The_OpenFOAM_flange_tutorial.md).
+
+The tutorial is for OpenFOAM-v2606, installed as in [01_Install_OpenFOAM-v2606_WSL.md](01_Install_OpenFOAM-v2606_WSL.md).
+
+**The finished case.** The case that you set up in this tutorial is also available, finished, in the directory `Task_1_OpenFOAM/Task1` of the course project. If something doesn't work, you can run it or compare your files with it (see [The finished case](#the-finished-case) at the end).
+
+1. [The tutorial case](#1-the-tutorial-case)
+2. [Copy the flange tutorial](#2-copy-the-flange-tutorial)
+3. [Mesh](#3-mesh)
+4. [Temperature initial guess and boundary conditions](#4-temperature-initial-guess-and-boundary-conditions)
+5. [Conductivity](#5-conductivity)
+6. [Source term](#6-source-term)
+7. [Discretization and linear solver](#7-discretization-and-linear-solver)
+8. [Course residual](#8-course-residual)
+9. [Iterations, monitoring and results](#9-iterations-monitoring-and-results)
+10. [Run the case](#10-run-the-case)
+11. [Look at the results](#11-look-at-the-results)
+12. [Set up your own case](#12-set-up-your-own-case)
 13. [Common errors](#13-common-errors)
 
-Appendix A. [Other options, also for older OpenFOAM versions](#appendix-a-other-options-also-for-older-openfoam-versions)
 
-The examples use case 1 and case 11 from the course:
+## 1. The tutorial case
 
-| | Case 1 | Case 11 |
-|---|---|---|
-| Domain | L = 1, H = 0.5 | L = H = 1 |
-| Boundary 1 (south, y = 0) | convective, h = 1000, T∞ = 35 | T = 10 |
-| Boundary 2 (east, x = L) | T = 10 + 20 sin(πy/H) | T = 20 |
-| Boundary 3 (north, y = H) | T = 10 | T = 20x/L |
-| Boundary 4 (west, x = 0) | dT/dn = 0 | dT/dn = 0 |
-| Conductivity | k = 5(1 + 100x/L) | k = 2(1 + 20T/T1), T1 = 10 |
-| Source term | b = −1.5 | b = 15(c1 − c2T²), c1 = 20, c2 = 0.2 |
+The 40 cases of Task 1 are built from a small number of building blocks:
 
-The other cases use the same building blocks. To run all 40 cases with ready-made
-scripts, continue with [Task_1_02_all_cases.md](Task_1_02_all_cases.md).
+| Building block | Variants in the 40 cases |
+|---|---|
+| Domain | L = 1 or 1.5, H = 0.5, 1 or 2 |
+| Dirichlet boundary | constant T, T varying with x, T varying with y |
+| Neumann boundary | dT/dn = 0 |
+| Convective boundary | −k dT/dn = h(T − T∞), h = 1000 |
+| Conductivity | varying with x, region-dependent (a jump), T-dependent, varying with y and T |
+| Source term | constant (also 0), quadratic in T |
 
-**OpenFOAM version:** This tutorial is for OpenFOAM-v2606 from openfoam.com, installed
-as in [01_Install_OpenFOAM-v2606_WSL.md](01_Install_OpenFOAM-v2606_WSL.md). Other options, also working in
-older versions, are given in [Appendix A](#appendix-a-other-options-also-for-older-openfoam-versions).
+The tutorial case is not one of the 40 cases. It is designed to contain all the building blocks:
 
+| | Tutorial case |
+|---|---|
+| Domain | L = 1.5, H = 0.5 |
+| Boundary 1 (south, y = 0) | convective, h = 1000, T∞ = 25 |
+| Boundary 2 (east, x = L) | T = 10 + 20 sin(πy/H) |
+| Boundary 3 (north, y = H) | T = 5(1 + x/L) |
+| Boundary 4 (west, x = 0) | dT/dn = 0 |
+| Conductivity | k = 0.01 for 0.7 < x < 1.1 and 0.3 < y < 0.4, k = 2(1 + 10x/L + 20T/T1) elsewhere, T1 = 10 |
+| Source term | b = 15(c1 − c2T²), c1 = 20, c2 = 0.2 |
+| Monitoring points | (0.43L, 0.43H) = (0.645, 0.215) and (0.77L, 0.77H) = (1.155, 0.385) |
 
-## 1. Steady heat conduction with laplacianFoam
+The constant Dirichlet values and the constant source term are special cases of the varying ones. Section 12 shows how to change the blocks for your own case.
 
-`laplacianFoam` solves
-
-    ddt(T) − laplacian(DT, T) = fvOptions(T)
-
-and the course equation is
+**The equation and the solver.** The cases are 2D steady heat-conduction problems, governed by the course equation
 
     ∂/∂x(k ∂T/∂x) + ∂/∂y(k ∂T/∂y) + b = 0.
 
-Three changes to the flange setup make these the same.
+The standard OpenFOAM solver `laplacianFoam` solves
 
-**Steady state.** Switch off the time derivative in `system/fvSchemes`:
-```cpp
-ddtSchemes
-{
-    default         steadyState;
-}
+    ddt(T) − laplacian(DT, T) = fvOptions(T)
+
+This is the course equation if the time derivative `ddt(T)` is switched off (with `steadyState` in `system/fvSchemes`, Section 7), the field `DT` holds the conductivity k (the file `0.orig/DT`, Section 5), and the source term b is added as an fvOption, `fvOptions(T)` (the file `system/fvOptions`, Section 6). The cases can therefore be run with `laplacianFoam`, without changing the solver.
+
+If you are interested, the top-level code of `laplacianFoam` is in `$FOAM_SOLVERS/basic/laplacianFoam/laplacianFoam.C`. The equation is written there as `fvm::ddt(T) - fvm::laplacian(DT, T) == fvOptions(T)`.
+
+
+## 2. Copy the flange tutorial
+
+Copy a fresh `flange` tutorial to a case directory named `Task1`, and go there:
+```sh
+cp -r $FOAM_TUTORIALS/basic/laplacianFoam/flange $FOAM_RUN/Task1
+cd $FOAM_RUN/Task1
 ```
-Each "time step" is now one iteration (one update of the coefficients and one call
-to the linear solver). Use `deltaT 1` and let `endTime` be the maximum number of
-iterations (`system/controlDict`):
-```cpp
-startTime       0;
-endTime         10000;     // maximum number of iterations
-deltaT          1;
-writeControl    timeStep;
-writeInterval   10000;     // write only at the end (see Section 10)
-```
+In the next sections, you create or replace the files of the case one at a time. Use `nano` (save with Ctrl+O and Enter, exit with Ctrl+X).
 
-**Conductivity.** In the flange tutorial, DT is a constant in
-`constant/transportProperties`. If a field file `0/DT` exists, `laplacianFoam` reads
-that field instead and ignores `transportProperties`, so DT can vary in space and be
-changed during the run. Use `DT` for k:
-```cpp
-FoamFile { version 2.0; format ascii; class volScalarField; object DT; }
-
-dimensions      [0 2 -1 0 0 0 0];   // what laplacianFoam expects
-internalField   uniform 1;          // set properly in Sections 5 and 6
-
-boundaryField
-{
-    "(south|east|north|west)"
-    {
-        type            calculated;
-        value           uniform 1;
-    }
-    frontAndBack
-    {
-        type            empty;
-    }
-}
-```
-OpenFOAM expects DT in m²/s (a diffusivity). Here DT simply holds the numbers of k
-in W/(m K). With T in K, the source term b in `fvOptions` then has the unit W/m³.
-The dimension checks don't mind, because all terms are scaled consistently.
-
-**Source term.** b is added through `system/fvOptions` (Section 7).
-
-**Initial condition.** The course code starts from T = 0, so use
-`internalField uniform 0;` in `0/T`.
-
-Keep the original files in `0.orig/` and start `Allrun` with `restore0Dir`, as in the
-flange tutorial. The utilities in the next sections modify the files in `0/`.
+There is no `0/` directory. As in the flange tutorial, `Allrun` creates it by copying `0.orig/`. The utilities and the solver then modify the files in `0/`, while the files in `0.orig/` are kept unchanged.
 
 
-## 2. A 2D mesh with non-equidistant cells
+## 3. Mesh
 
-OpenFOAM meshes are always 3D. A 2D case is a mesh that is **one cell thick** in z,
-with the front and back faces in a patch of type `empty`. Name the four sides after
-their boundary numbers in the task, so that the dictionaries are easy to read:
-
-| Task boundary | Location | Patch name |
-|---|---|---|
-| 1 | y = 0 | `south` |
-| 2 | x = L | `east` |
-| 3 | y = H | `north` |
-| 4 | x = 0 | `west` |
-| – | z = 0 and z = thickness | `frontAndBack` (type `empty`) |
-
-A `system/blockMeshDict` for case 11 (L = H = 1, 20 × 20 cells), with cells that are
-smaller near the boundaries:
+Create the file `system/blockMeshDict`:
 ```cpp
 FoamFile { version 2.0; format ascii; class dictionary; object blockMeshDict; }
 
-L   1;
-H   1;
+L   1.5;
+H   0.5;
+D   0.1;            // thickness in z
 
 vertices
 (
     (0  0  0) ($L 0  0) ($L $H 0) (0 $H 0)
-    (0  0  1) ($L 0  1) ($L $H 1) (0 $H 1)
+    (0  0  $D) ($L 0  $D) ($L $H $D) (0 $H $D)
 );
 
 blocks
 (
-    hex (0 1 2 3 4 5 6 7) (20 20 1)
+    hex (0 1 2 3 4 5 6 7) (30 20 1)
     simpleGrading
     (
-        // (fraction of length, fraction of cells, last/first cell size)
         ((0.5 0.5 3) (0.5 0.5 0.333))   // x: fine at both ends
         ((0.5 0.5 3) (0.5 0.5 0.333))   // y: fine at both ends
         1
@@ -159,201 +114,97 @@ boundary
     frontAndBack { type empty; faces ((0 3 2 1) (4 5 6 7)); }
 );
 ```
-Run `blockMesh` and `checkMesh`. `checkMesh` should report the mesh as OK with zero
-non-orthogonality.
-
-Notes:
-- **Grading.** The course recommends that neighbouring cells differ in size by at most
-  about 15 %. With n cells and a total expansion ratio R, the ratio between neighbours
-  is R^(1/(n−1)). For 10 cells in each half and R = 3 this is 1.13.
-- **Course meshes.** The course mesh generator can also write the mesh directly in
-  OpenFOAM format (`constant/polyMesh`). Use that to get exactly the same mesh as in
-  your own code (for example the validation mesh). Copy the `constant/polyMesh`
-  directory into the case and skip `blockMesh`. If a side is split into several
-  patches (`south_0`, `south_1`, …), use regular-expression patch names in the field
-  files, e.g. `"south.*"`.
-- **Per unit depth.** OpenFOAM integrates over the real face areas and cell volumes,
-  so heat rates come out for the thickness of the mesh. Use thickness 1, or divide
-  heat rates by the thickness, to get W/m as in the course code.
-- **Nodes.** OpenFOAM is cell-centred. The cell centres are the nodes of the course
-  code. The boundary face centres are the boundary nodes. The corner nodes of the
-  course code are only used to hold values for visualization. OpenFOAM stores no
-  values there, but ParaView shows values interpolated to all mesh points, including
-  the corners, when *Create cell-to-point filtered data* is ticked.
-
-
-## 3. Spatially varying temperature (Dirichlet) boundary conditions
-
-Example: boundary 2 of case 1, T = 10 + 20 sin(πy/H).
-
-**Recommended: an expression in the boundary condition.** `uniformFixedValue` takes
-a function for its value. The function `expression` evaluates a formula on the patch,
-in which `pos()` is the face centre. In `0.orig/T`:
-```cpp
-east
-{
-    type            uniformFixedValue;
-    uniformValue
-    {
-        type        expression;
-        variables   ("H = 0.5");
-        expression  #{ 10 + 20*sin(pi()*pos().y()/H) #};
-    }
-    value           uniform 10;     // only used before the first evaluation
-}
+Run:
+```sh
+blockMesh
+checkMesh
 ```
-The expression language uses C++-like syntax: `pi()`, `sin`, `cos`, `exp`, `pow(a,b)`,
-`sqr`, `mag`, `min`, `max`, `pos().x()`, `pos().y()`, and the conditional
-`(cond ? a : b)`. Constants are defined in `variables` as `"name = value"`.
+`checkMesh` should end with `Mesh OK.`
 
-**Alternative: set the values once with a utility.** Keep the patch as an ordinary
-`fixedValue` and let `setExprBoundaryFields` write the values into `0/T` before the
-run. `system/setExprBoundaryFieldsDict`:
+- **2D.** OpenFOAM meshes are always 3D. A 2D case has a mesh that is one cell thick in z, with the front and back faces in a patch of type `empty`.
+- **Patch names.** The four sides are named after the boundaries of the task: `south` (boundary 1, y = 0), `east` (boundary 2, x = L), `north` (boundary 3, y = H) and `west` (boundary 4, x = 0).
+- **Cells.** 30 × 20 cells, smaller near the boundaries. `((0.5 0.5 3) (0.5 0.5 0.333))` means: the first half of the length has half of the cells, and the last cell is 3 times larger than the first, and the other way around in the second half. The size ratio between neighbouring cells is then 3^(1/14) = 1.08 in x and 3^(1/9) = 1.13 in y, below the 15 % recommended in the course.
+- **Thickness.** The mesh is `D` = 0.1 m thick, the same as from the course mesh generator. The heat rates are divided by the thickness in `system/controlDict` (Section 9), so that they come out per unit depth (W/m), as in the course code.
+- **Nodes.** OpenFOAM stores the temperature in the cell centres, which are the nodes of the course code. The boundary face centres are the boundary nodes.
+
+
+## 4. Temperature initial guess and boundary conditions
+
+The initial guess and the boundary conditions of T can be set directly in `0.orig/T`.
+
+Replace the content of `0.orig/T` with:
 ```cpp
-FoamFile { version 2.0; format ascii; class dictionary; object setExprBoundaryFieldsDict; }
+FoamFile { version 2.0; format ascii; class volScalarField; object T; }
 
-dirichletTemperatures
+dimensions      [0 0 0 1 0 0 0];
+internalField   uniform 0;
+
+boundaryField
 {
-    field       T;
-    expressions
-    (
+    south
+    {
+        type            externalWallHeatFluxTemperature;
+        mode            coefficient;
+        Ta              constant 25;
+        h               uniform 1000;
+        kappaMethod     lookup;
+        kappa           DT;
+        value           uniform 25;
+    }
+    east
+    {
+        type            uniformFixedValue;
+        uniformValue
         {
-            patch       east;
-            target      value;
+            type        expression;
             variables   ("H = 0.5");
             expression  #{ 10 + 20*sin(pi()*pos().y()/H) #};
         }
-        // ... one block per patch
-    );
-    keepPatches true;
-}
-```
-Run it with `runApplication setExprBoundaryFields` in `Allrun` (after `restore0Dir`).
-The result is an ordinary `fixedValue` patch with a `nonuniform` list of values,
-which you can inspect in `0/T`.
-
-A `fixedValue` patch contributes to the diagonal and the right-hand side of the
-matrix for the adjacent cells. This is the same as setting the boundary node
-temperature in the course code.
-
-Other options, also working in older versions, are given in [Appendix A.1](#a1-spatially-varying-temperature-section-3).
-
-
-## 4. Heat-flux (Neumann) boundary conditions
-
-- Homogeneous (dT/dn = 0, insulated): `type zeroGradient;`. The boundary value is
-  then equal to the temperature of the adjacent cell, as for the course code's
-  boundary nodes.
-- Prescribed gradient: `type fixedGradient; gradient uniform -50;`, or
-  `uniformFixedGradient` with an `expression` (as in Section 3) for a varying gradient.
-  The gradient is ∂T/∂n with **n pointing out of the domain**. A heat flux q into the
-  domain therefore corresponds to `gradient = q/k`.
-
-
-## 5. Spatially varying conductivity
-
-Example: case 1, k = 5(1 + 100x/L).
-
-The conductivity is needed in the cells and at the boundary faces. OpenFOAM
-interpolates the cell values to the internal faces (Section 9), and uses the
-boundary-face values of `DT` for the boundary faces.
-
-**Cell values: `setExprFields`.** `system/setExprFieldsDict`:
-```cpp
-FoamFile { version 2.0; format ascii; class dictionary; object setExprFieldsDict; }
-
-expressions
-(
-    DT
-    {
-        field       DT;
-        variables   ("L = 1");
-        expression  #{ 5*(1 + 100*pos().x()/L) #};
-        dimensions  [0 2 -1 0 0 0 0];
+        value           uniform 10;
     }
-);
-```
-
-**Boundary values: `setExprBoundaryFields`.** Add a block to
-`system/setExprBoundaryFieldsDict`, with one entry per patch:
-```cpp
-conductivity
-{
-    field       DT;
-    expressions
-    (
+    north
+    {
+        type            uniformFixedValue;
+        uniformValue
         {
-            patch       south;
-            target      value;
-            variables   ("L = 1");
-            expression  #{ 5*(1 + 100*pos().x()/L) #};
+            type        expression;
+            variables   ("L = 1.5");
+            expression  #{ 5*(1 + pos().x()/L) #};
         }
-        // ... same for east, north and west
-    );
-    keepPatches true;
+        value           uniform 5;
+    }
+    west
+    {
+        type            zeroGradient;
+    }
+    frontAndBack
+    {
+        type            empty;
+    }
 }
 ```
-Run `setExprBoundaryFields` and then `setExprFields` in `Allrun`, before the solver.
-k doesn't change during the run, so this is all you need.
+- **Initial guess.** `internalField uniform 0` starts the iterations from T = 0, as the course code.
+- **Dirichlet boundaries (east and north).** `uniformFixedValue` with an `expression` evaluates a formula at each boundary face. `pos()` is the face centre, so `pos().x()` is x and `pos().y()` is y. Constants are set in `variables`. The expressions use C++-like syntax: `pi()`, `sin`, `cos`, `exp`, `pow(a,b)`, `sqr`, `min`, `max`.
+- **Neumann boundary (west).** `zeroGradient` gives dT/dn = 0. The boundary value is equal to the temperature in the adjacent cell.
+- **Convective boundary (south).** The heat flux from the cell to the face equals the convective heat flux from the face, h(T∞ − T_b) = k_b(T_b − T_P)/δ, where T_P is the temperature in the adjacent cell, T_b the boundary value, and δ the distance between the cell centre and the face. This gives T_b = f T∞ + (1 − f) T_P with f = h/(h + k_b/δ). The boundary condition `externalWallHeatFluxTemperature` with `mode coefficient` does exactly this, with T∞ given by `Ta` and h by `h`. It is implicit, i.e. the T_P part goes into the matrix.
+- **`kappaMethod lookup`** and **`kappa DT`** make it take k_b from the boundary values of the field `DT` (Section 5).
+- **`externalWallHeatFluxTemperature`** is in the library `thermoTools`. It requires the line `libs (thermoTools);` in `system/controlDict` (Section 9).
+- **`value`** is a placeholder for the boundary values, e.g. for ParaView, which reads the values from the file without evaluating the boundary condition. OpenFOAM evaluates the boundary condition and writes the computed values in `value` in the result files.
 
-**Region-dependent conductivity.** Example: k = 0.01 in 0.7 < x < 1.1,
-0.3 < y < 0.4, and k = 20 elsewhere. You can use a conditional expression in
-`setExprFieldsDict`:
+
+## 5. Conductivity
+
+The conductivity k in the course equation is the field `DT` in the equation solved by `laplacianFoam` (see "The equation and the solver" in Section 1). In the flange tutorial, DT is a constant in `constant/transportProperties`. If a file `0/DT` exists, `laplacianFoam` reads that field instead, so k can vary in space and change during the run.
+
+The boundary values of k can be set directly in `0.orig/DT`, with expressions in the boundary conditions. The values in the cells can't be given as expressions in that file, so they are set with the utility `setExprFields` before the run (Section 10).
+
+Create the file `0.orig/DT`:
 ```cpp
-expression  #{ (pos().x() > 0.7 && pos().x() < 1.1 && pos().y() > 0.3 && pos().y() < 0.4)
-               ? 0.01 : 20 #};
-```
-Or use the classic `setFields` with `system/setFieldsDict`:
-```cpp
-defaultFieldValues ( volScalarFieldValue DT 20 );
-regions
-(
-    boxToCell
-    {
-        box (0.7 0.3 -1) (1.1 0.4 2);
-        fieldValues ( volScalarFieldValue DT 0.01 );
-    }
-);
-```
-Both select cells by their **cell centre**, like the nodes in the course code. The
-region doesn't touch the boundary here, so the boundary values in `0.orig/DT` can
-simply be `uniform 20`.
+FoamFile { version 2.0; format ascii; class volScalarField; object DT; }
 
-How k is interpolated to the faces matters a lot when k jumps between neighbouring
-cells. See `laplacianSchemes` in Section 9.
+dimensions      [0 2 -1 0 0 0 0];
+internalField   uniform 2;
 
-
-## 6. Temperature-dependent conductivity
-
-Example: case 11, k = 2(1 + 20T/T1).
-
-The equation is now nonlinear. As in the course code, it is solved by Picard
-iteration: k is computed from the latest temperature, the linear system is solved
-with this k, k is updated again, and so on. In OpenFOAM, k is updated after each
-iteration by a function object, and at the boundary faces by a boundary condition.
-
-**Cell values: the `exprField` function object.** It re-evaluates `DT` after every
-iteration. In `system/controlDict`:
-```cpp
-functions
-{
-    conductivity
-    {
-        type            exprField;
-        libs            (fieldFunctionObjects);
-        field           DT;
-        action          modify;          // change the existing field DT
-        variables       ("T1 = 10");
-        expression      "2*(1 + 20*T/T1)";
-        writeControl    writeTime;       // otherwise DT is written every iteration
-    }
-    // ... other function objects
-}
-```
-
-**Boundary values: an expression boundary condition on `DT`.** In a patch expression,
-`T` is the boundary value of T on that patch. `0.orig/DT`:
-```cpp
 boundaryField
 {
     "(south|east|north|west)"
@@ -362,10 +213,10 @@ boundaryField
         uniformValue
         {
             type        expression;
-            variables   ("T1 = 10");
-            expression  #{ 2*(1 + 20*T/T1) #};
+            variables   ("L = 1.5" "T1 = 10");
+            expression  #{ 2*(1 + 10*pos().x()/L + 20*T/T1) #};
         }
-        value           uniform 2;       // k(T = 0), used in the first iteration
+        value           uniform 2;
     }
     frontAndBack
     {
@@ -373,181 +224,121 @@ boundaryField
     }
 }
 ```
-The boundary values are updated when the function object modifies `DT`. For the
-initial cell values, use `setExprFields` as in Section 5, with the same expression
-(it reads the initial T = 0).
+- **Boundary values.** The boundary condition sets DT at each boundary face, from the boundary value of T.
+- **`internalField uniform 2`** is only a placeholder. The cell values are set by `setExprFields`. The entries `value uniform 2` are placeholders for the boundary values, in the same way as `value` in `0.orig/T` (Section 4).
+- **Unit.** OpenFOAM expects DT in m²/s (a diffusivity). Here DT simply holds the values of k in W/(m K), and the source term then has the unit W/m³. The dimension checks don't mind, since all terms are scaled in the same way.
 
-Notes:
-- **Order.** Function objects are executed in the order they are listed. List
-  `conductivity` before function objects that use k, such as the course residual
-  (Section 10).
-- **Fields in expressions.** Fields used in expressions must be registered (`T` and
-  `DT` always are in `laplacianFoam`). For a utility like `setExprFields`, add
-  `readFields (T);` to its dictionary.
-- **No `setExprBoundaryFields` for `DT` with patterns.** Don't use
-  `setExprBoundaryFields` on a field whose patches are given by a pattern such as
-  `"(south|east|north|west)"` (see Section 13). Here it isn't needed anyway.
-- **Same result, different path.** The converged result is the same whatever the
-  first-iteration k is. Only the convergence history changes a little.
+Create the file `system/setExprFieldsDict`:
+```cpp
+FoamFile { version 2.0; format ascii; class dictionary; object setExprFieldsDict; }
 
-Other options, also working in older versions, are given in [Appendix A.2](#a2-temperature-dependent-conductivity-section-6).
+readFields      (T);
+
+expressions
+(
+    DT
+    {
+        field       DT;
+        variables   ("L = 1.5" "T1 = 10");
+        expression  #{ (pos().x() > 0.7 && pos().x() < 1.1 && pos().y() > 0.3 && pos().y() < 0.4) ? 0.01 : 2*(1 + 10*pos().x()/L + 20*T/T1) #};
+        dimensions  [0 2 -1 0 0 0 0];
+    }
+);
+```
+- **Cell values.** The utility `setExprFields` reads `system/setExprFieldsDict` and sets DT in the cells only once, when it is run by `Allrun` before the simulation starts (Section 10). It uses the initial guess of the temperature, T = 0 (`internalField` in `0.orig/T`, Section 4). In a cell expression, `pos()` is the cell centre. The region is selected with a conditional expression `(condition) ? a : b`, which gives `a` where the condition is true and `b` elsewhere. A cell is in the region if its centre is, like a node in the course code. The region doesn't touch the boundary, so the expression in `0.orig/DT` has no condition.
+- **`readFields (T);`** makes `setExprFields` read T, which is used in the expression.
+- **T-dependent k.** During the simulation, DT is updated from the latest temperature after each iteration. In the cells, this is done by the function object `conductivity` in `system/controlDict` (Section 9), which uses the same expression as `system/setExprFieldsDict`. If you change the expression, change it in both files. At the boundary faces, it is done by the boundary condition in `0/DT`, with the latest boundary temperature. This is the Picard iteration of the course code.
 
 
-## 7. Source terms, linearized and implicit
+## 6. Source term
 
-**Linearization.** In finite-volume form, the source in a cell is written
-b = Su + Sp·T_P, as in the course:
-- Su goes to the right-hand side.
-- −Sp·ΔV goes to the diagonal coefficient a_P.
+The source term must be added directly to the coefficients of the discretized equations, i.e. we need to manipulate the discretization. We do that without touching the original solver `laplacianFoam`, using an fvOption of type `scalarCodedSource`. fvOptions are extra terms that `laplacianFoam` adds to its equation (the term `fvOptions(T)` in the equation solved by `laplacianFoam`, see "The equation and the solver" in Section 1).
 
-With **Sp ≤ 0** this makes the matrix more diagonally dominant, so the Gauss-Seidel
-or CG iterations converge better. This is what "implicit" means for a source term.
+The source term integrated over a cell, b·ΔV, is split as Su + Sp·T_P, as in the course, where T\* is the latest temperature:
 
-For b(T) = 15(c1 − c2T²), linearize around the latest temperature T\*:
+    Su = 15 c1 ΔV
+    Sp = −15 c2 T* ΔV                    (≤ 0 for T* ≥ 0)
 
-    b ≈ b(T*) + (db/dT)(T*)·(T − T*)
-      = 15(c1 − c2T*²) − 30c2T*·(T − T*)
+As in the course code, Su goes to the right-hand side of the equation system, and −Sp goes to the diagonal coefficient a_P. This is done by the small piece of code in the fvOption, which OpenFOAM compiles the first time the case is run.
 
-    Sp = −30 c2 T*                (≤ 0 for T* ≥ 0)
-    Su = 15(c1 − c2T*²) − Sp·T* = 15(c1 + c2T*²)
-
-At convergence, T = T\* and Su + Sp·T = b(T) exactly.
-
-**Constant source: `semiImplicitSource`.** `system/fvOptions` for b = −1.5:
+Create the file `system/fvOptions`:
 ```cpp
 FoamFile { version 2.0; format ascii; class dictionary; object fvOptions; }
 
 source
 {
-    type            scalarSemiImplicitSource;   // note "scalar" in the type name
-    selectionMode   all;                        // all cells
-    volumeMode      specific;                   // values per m3 (W/m3)
-    sources
-    {
-        T           (-1.5 0);                   // (Su Sp)
-    }
-}
-```
-
-**Temperature-dependent source.** The explicit (Su) and implicit (Sp) parts can be
-expressions, evaluated with the latest T in each iteration:
-```cpp
-source
-{
-    type            scalarSemiImplicitSource;
+    type            scalarCodedSource;
+    name            source;
     selectionMode   all;
-    volumeMode      specific;
-    sources
-    {
-        T
+    fields          (T);
+
+    codeAddSup
+    #{
+        const scalar c1 = 20;
+        const scalar c2 = 0.2;
+        const scalarField& V = mesh_.V();
+        const scalarField& T = eqn.psi().primitiveField();
+        scalarField& diag = eqn.diag();
+        scalarField& source = eqn.source();
+        forAll(V, celli)
         {
-            explicit
-            {
-                type        exprField;
-                variables   ("c1 = 20" "c2 = 0.2");
-                expression  "15*(c1 + c2*T*T)";         // Su
-            }
-            implicit
-            {
-                type        exprField;
-                variables   ("c2 = 0.2");
-                expression  "-30*c2*max(T, 0)";         // Sp, kept <= 0
-            }
+            const scalar Su = 15*c1*V[celli];
+            const scalar Sp = -15*c2*max(T[celli], scalar(0))*V[celli];
+            diag[celli] += Sp;
+            source[celli] -= Su;
         }
-    }
+    #};
+    codeCorrect
+    #{
+    #};
+    codeConstrain
+    #{
+    #};
 }
 ```
-Use `max(T, 0)` so that Sp stays ≤ 0 also for negative temperatures during the
-iterations. You could also put the whole source in `explicit` and use `implicit 0`.
-That is fully explicit and converges more slowly, and may not converge at all for a
-strongly temperature-dependent source.
-
-A source in only part of the domain: use `selectionMode cellZone;` and
-`cellZone myZone;`. Create the zone with `topoSet`, e.g. a `boxToCell` cellSet
-converted to a cellZone with `setToCellZone`.
-
-Other options, also working in older versions, are given in [Appendix A.3](#a3-temperature-dependent-source-section-7).
+- **`codeAddSup`** is called each time the equation for T is set up, i.e. once per iteration, with the latest temperature `T`.
+- **`V`** is the cell volume ΔV.
+- **`diag`** holds the coefficients of T in the source term, and `source` the rest, with the opposite sign. `diag += Sp` puts −Sp in a_P, since the source term is on the other side of the equation.
+- **Sp ≤ 0** makes the matrix more diagonally dominant, which makes the iterations converge better. `max(T, 0)` keeps Sp ≤ 0 also if T becomes negative during the iterations. T is positive in the converged solution, so it doesn't change the result.
+- At convergence, T_P = T\* and Su + Sp·T_P = b(T_P)·ΔV.
+- **`codeCorrect`** and **`codeConstrain`** are not used, but must be there.
 
 
-## 8. Convective boundary conditions
+## 7. Discretization and linear solver
 
-Example: boundary 1 of case 1, −k ∂T/∂n = h(T_b − T∞), with h = 1000 and T∞ = 35.
-
-**Derivation.** Let T_P be the temperature in the adjacent cell and δ the distance
-from its centre to the boundary face. The face is a node without volume, so the
-conductive flux from the face into the cell equals the convective flux to the face:
-
-    h (T∞ − T_b) = k_b (T_b − T_P) / δ
-
-Solving for the face value:
-
-    T_b = f T∞ + (1 − f) T_P,      f = h / (h + k_b/δ)
-
-This is exactly OpenFOAM's `mixed` boundary condition:
-
-    T_b = f·refValue + (1 − f)·(T_P + δ·refGradient)
-
-with refValue = T∞, refGradient = 0 and valueFraction = f.
-
-**Why this is implicit.** The heat rate through the face becomes
-
-    Q = k_b (T_b − T_P)/δ · A = A (T∞ − T_P) / (1/h + δ/k_b)
-
-which is linear in T_P. The mixed condition puts the T_P part on the diagonal of the
-matrix and the T∞ part on the right-hand side, so the boundary condition is fully
-implicit. This is the series resistance 1/h + δ/k of the convective film and the
-half cell.
-
-**`uniformMixed` with an expression.** The expression needs
-δ. Patch expressions have no direct access to δ, so it is computed from the face
-centre `pos()` and the cell centre. The cell centres must be available as a field
-`C`, see below. In `0.orig/T`:
+Replace the content of `system/fvSchemes` with:
 ```cpp
-south
+FoamFile { version 2.0; format ascii; class dictionary; object fvSchemes; }
+
+ddtSchemes
 {
-    type            uniformMixed;
-    uniformValue    constant 35;                // T_inf
-    uniformGradient constant 0;
-    uniformValueFraction
-    {
-        type        expression;
-        variables
-        (
-            "h = 1000"
-            "delta = mag((pos() - internalField(C)) & normal())"
-        );
-        expression  #{ h/(h + DT/delta) #};     // DT = k at the boundary face
-    }
-    value           uniform 35;
+    default         steadyState;
+}
+gradSchemes
+{
+    default         Gauss linear;
+}
+divSchemes
+{
+    default         none;
+}
+laplacianSchemes
+{
+    default         Gauss linear orthogonal;
+}
+interpolationSchemes
+{
+    default         linear;
+}
+snGradSchemes
+{
+    default         orthogonal;
 }
 ```
-
-The field `C` has to be written before the run and loaded during it:
-- In `Allrun`, after `restore0Dir`:
-  ```sh
-  runApplication postProcess -func writeCellCentres -time 0
-  ```
-- First in the `functions` of `controlDict`:
-  ```cpp
-  readC
-  {
-      type            readFields;
-      libs            (fieldFunctionObjects);
-      fields          (C);
-  }
-  ```
-
-If k depends on T at the boundary, the condition uses the latest `DT` boundary values
-from Section 6.
-
-Other options, also working in older versions, are given in [Appendix A.4](#a4-convective-boundary-conditions-section-8).
-
-
-## 9. Linear solver and discretization settings
-
-**Course-like settings.** The course code does a fixed number of Gauss-Seidel sweeps
-per iteration (`nLinSolIter`). In `system/fvSolution`:
+Replace the content of `system/fvSolution` with:
 ```cpp
+FoamFile { version 2.0; format ascii; class dictionary; object fvSolution; }
+
 solvers
 {
     T
@@ -555,9 +346,9 @@ solvers
         solver          smoothSolver;
         smoother        GaussSeidel;
         nSweeps         1;
-        tolerance       0;          // never stop early ...
+        tolerance       0;
         relTol          0;
-        minIter         10;         // ... but always do exactly 10 sweeps
+        minIter         10;
         maxIter         10;
     }
 }
@@ -567,91 +358,25 @@ SIMPLE
     nNonOrthogonalCorrectors 0;
 }
 ```
-OpenFOAM sweeps through the cells in its own cell order, which can differ from the
-loop order in your code. The convergence history is therefore similar but not
-identical.
-
-**Efficient settings.** The matrix is symmetric, so the preconditioned conjugate
-gradient method is a good choice:
-```cpp
-T
-{
-    solver          PCG;
-    preconditioner  DIC;
-    tolerance       1e-12;
-    relTol          0;
-}
-```
-A linear case (k and b independent of T) then converges in one iteration. A
-nonlinear case needs a few Picard iterations.
-
-**Discretization** (`system/fvSchemes`):
-```cpp
-laplacianSchemes
-{
-    default         Gauss linear corrected;   // k: linear interpolation to the faces
-}
-snGradSchemes
-{
-    default         corrected;                // face gradient (T_N − T_P)/|d|
-}
-interpolationSchemes
-{
-    default         linear;
-}
-gradSchemes
-{
-    default         Gauss linear;             // only used in post-processing
-}
-divSchemes
-{
-    default         none;
-}
-```
-- `linear` interpolation of k to a face uses the distances to the two cell centres,
-  as in the course code on non-equidistant meshes.
-- For a conductivity that jumps between cells (region-dependent k), try
-  `Gauss harmonic corrected`. It gives the face conductivity of two resistances in
-  series and is the physically correct choice there.
-- The meshes are orthogonal, so `corrected` and `orthogonal` give the same result.
-  `orthogonal` skips the (zero) correction.
+- **`steadyState`** switches off the time derivative `ddt(T)` in the equation solved by `laplacianFoam` (see "The equation and the solver" in Section 1). Each "time step" is then one iteration: k and b are updated, and the linear solver is called once.
+- **`Gauss linear orthogonal`** interpolates k linearly to the faces (`linear`), using the distances to the two cell centres, as in the course code. The face gradient is (T_N − T_P)/|d| (`orthogonal`).
+- **`orthogonal`** is used because the mesh is orthogonal: the line between two cell centres is perpendicular to the face between them. On a non-orthogonal mesh, `corrected` must be used instead, which adds a correction for the non-orthogonality.
+- **Linear solver.** As in the course code, each iteration does a fixed number of Gauss-Seidel sweeps (`nLinSolIter` = 10): `minIter` and `maxIter` are both 10, and `tolerance 0` and `relTol 0` make sure that the solver never stops earlier. OpenFOAM sweeps through the cells in its own order, so the convergence history is similar to, but not the same as, that of your code.
 
 
-## 10. Convergence: residuals and stopping the iterations
+## 8. Course residual
 
-**OpenFOAM's residual.** The log reports for each iteration
+Everything in this section is only for computing and printing the normalized residual in the same form as in Task 1, and stopping the simulation and writing out the result when the normalized residual reaches the convergence criterion. Without it, the simulation continues until `endTime` in `system/controlDict` (Section 9), i.e. 10000 iterations. OpenFOAM can also stop on its own residual, with `residualControl` in `system/fvSolution`, but that is not covered here.
 
-    Solving for T, Initial residual = …, Final residual = …, No Iterations …
-
-The *initial residual* is Σ|b − A·T| for the T of the previous iteration, divided by a
-normalization factor computed from the matrix and the solution. This is *not* the
-course residual, which normalizes by the total heat rate F. Both decrease as the
-iterations converge, but the values differ.
-
-**Stopping on OpenFOAM's residual.** `laplacianFoam` uses the `SIMPLE` dictionary, so
-you can stop when the initial residual is small enough:
-```cpp
-SIMPLE
-{
-    nNonOrthogonalCorrectors 0;
-    residualControl
-    {
-        T           1e-6;
-    }
-}
-```
-The log then says `SIMPLE solution converged in N iterations`, and the last iteration
-is written.
-
-**The course residual ε (coded function object).** The course residual is
+OpenFOAM's own residual (`Initial residual` in the log) is normalized in another way than the course residual. The course residual is calculated as
 
     ε = Σ_cells |a_P T_P − (Σ a_nb T_nb + Su)| / F
 
-where F is the total heat rate into the domain: through the boundaries and from
-positive sources. OpenFOAM can give you the matrix of the latest iteration, so ε can
-be computed with a short coded function object. Put it in `system/courseResidual`
-and include it in the `functions` of `controlDict`, after `conductivity` if you have
-one:
+where F is the total heat rate into the domain, through the boundaries and from positive source terms. The normalized residual ε is computed by a function object of type `coded`, i.e. a function object with a small piece of code, which OpenFOAM compiles the first time the case is run. Function objects are executed after each iteration (Section 9).
+
+The function object is put in a separate file, which is included in `system/controlDict` (Section 9). It could also have been placed directly in `system/controlDict`, but a separate file keeps `controlDict` easier to read.
+
+Create the file `system/courseResidual`:
 ```cpp
 courseResidual
 {
@@ -719,229 +444,170 @@ courseResidual
     #};
 }
 ```
-Notes:
-- `TEqn.residual()` is the residual of each cell. `bV` is the source b·ΔV of each
-  cell. `DT·snGrad(T)·A` is the heat rate into the domain through each boundary face.
-- Both the residual and F scale with the mesh thickness, so ε is independent of it.
-- **Variables inside the code.** Values from `#include`d files (`$resTol`) are not
-  visible inside the `#{ … #}` code. Read them from the function-object dictionary in
-  `codeRead`, as above.
-- **Fields written at the end.** `writeAndEnd()` writes the fields of the last
-  iteration, but `laplacianFoam`'s own extra fields (`gradTx`, `flux`, …) are only
-  written at regular write times. Section 11 therefore computes the heat flux with
-  function objects.
-- **Other stopping rules.** If neither a residual criterion nor `endTime` is reached,
-  the run stops at `endTime`, i.e. after the maximum number of iterations.
+- It sets up the discretized equation of the latest temperature, in the same way as `laplacianFoam`, and computes ε with the matrix residual `TEqn.residual()`.
+- It writes `courseResidual: epsilon = …` to the log after each iteration.
+- It stops the run when ε < `resTol`, and writes the results of the last iteration.
 
-**Plotting residual histories.** The `solverInfo` function object writes the
-OpenFOAM residuals to `postProcessing/solverInfo/0/solverInfo.dat`:
+
+## 9. Iterations, monitoring and results
+
+Replace the content of `system/controlDict` with:
 ```cpp
-solverInfo
+FoamFile { version 2.0; format ascii; class dictionary; object controlDict; }
+
+application     laplacianFoam;
+
+thickness       0.1;            // mesh thickness in z
+
+libs            (thermoTools);
+
+
+startFrom       startTime;
+startTime       0;
+stopAt          endTime;
+endTime         10000;          // maximum number of iterations
+deltaT          1;              // one "time step" = one iteration
+
+writeControl    timeStep;
+writeInterval   10000;          // write only at the end
+purgeWrite      0;
+writeFormat     ascii;
+writePrecision  12;
+writeCompression off;
+timeFormat      general;
+timePrecision   8;
+runTimeModifiable false;
+
+functions
 {
-    type            solverInfo;
-    libs            (utilityFunctionObjects);
-    fields          (T);
-}
-```
-The utility `foamLog log.laplacianFoam` extracts residuals and other values from the
-log into `logs/`. `foamMonitor -l postProcessing/solverInfo/0/solverInfo.dat` plots
-them during the run (it needs gnuplot). For ε, filter the log, e.g.
-`grep 'courseResidual' log.laplacianFoam`.
-
-
-## 11. Post-processing
-
-Function objects can run during the simulation (in `functions` of `controlDict`) or
-afterwards on the written results. For running them afterwards, use the solver in
-post-processing mode:
-```sh
-laplacianFoam -postProcess -dict system/postProcessDict -latestTime
-```
-This reads `T`, `DT` and `fvOptions` exactly as the solver does. The utility
-`postProcess` only reads the fields you name with `-fields '(T DT)'`.
-
-`system/postProcessDict` holds a `functions` dictionary like the one in
-`controlDict`. The function objects below can all go into it.
-
-### Temperature distribution
-
-Create an empty file `case.foam` and open it in ParaView. T is
-cell data, as in the course code. Tick *Create cell-to-point filtered data* in
-*Properties* (not ticked by default in ParaView 6.2), or use the filter
-*Cell Data to Point Data*, for smooth contours
-(*Contour* filter, or colouring with a discrete colour map). Use the *Mesh Regions*
-list to show the boundary patches, which carry the boundary values.
-
-The extreme values, including the boundary values, are given by:
-```cpp
-TminMax
-{
-    type            fieldMinMax;
-    libs            (fieldFunctionObjects);
-    fields          (T);
-    location        true;
-}
-```
-
-### Heat-flux vectors
-
-The heat flux is q = −k∇T. Compute k∇T with two function objects:
-```cpp
-gradT
-{
-    type            grad;
-    libs            (fieldFunctionObjects);
-    field           T;
-    result          gradT;
-}
-kGradT
-{
-    type            multiply;
-    libs            (fieldFunctionObjects);
-    fields          (DT gradT);
-    result          kGradT;          // = k grad(T) = -q
-}
-```
-In ParaView, use the *Calculator* with the expression `-kGradT` to get q, and then
-*Glyph* (arrows) to show the vectors.
-
-At the boundary faces, the normal component of `gradT` is the face-normal gradient
-(T_b − T_P)/δ, so `kGradT` at the boundaries gives the wall heat flux directly (see
-below). `laplacianFoam` also writes a field `flux` = k∇T, but only at regular write
-times (Section 10).
-
-### Wall heat flux and heat rate through each boundary
-
-The heat rate *into* the domain through a boundary is ∫ k ∂T/∂n dA, with n pointing
-out of the domain:
-```cpp
-heatRateSouth
-{
-    type            surfaceFieldValue;
-    libs            (fieldFunctionObjects);
-    regionType      patch;
-    name            south;
-    operation       areaNormalIntegrate;    // sum over faces of kGradT·n A
-    fields          (kGradT);
-    writeFields     true;                   // also write the values of each face ...
-    surfaceFormat   raw;                    // ... as a text file
-}
-heatRateEast    { $heatRateSouth;  name east;  }   // inherits all other entries
-heatRateNorth   { $heatRateSouth;  name north; }
-heatRateWest    { $heatRateSouth;  name west;  }
-```
-- The heat rates are in `postProcessing/heatRate*/0/surfaceFieldValue.dat`. Positive
-  means into the domain. Divide by the mesh thickness for W/m.
-- The face values are in `postProcessing/heatRateSouth/surface/<time>/kGradT_patch_south.raw`,
-  with columns x y z and the components of k∇T. The wall-normal heat flux out of the
-  domain is −k∇T·n. On `south` the normal is n = (0, −1, 0), so q_wall = kGradT_y.
-
-### Source heat rate and global heat balance
-
-Evaluate b with the final temperature and integrate over the domain:
-```cpp
-b
-{
-    type            exprField;
-    libs            (fieldFunctionObjects);
-    field           b;
-    expression      "15*(20 - 0.2*T*T)";
-}
-sourceHeatRate
-{
-    type            volFieldValue;
-    libs            (fieldFunctionObjects);
-    regionType      all;
-    operation       volIntegrate;
-    fields          (b);
-    writeFields     false;
-}
-```
-Global energy balance: the sum of the four boundary heat rates plus the source heat
-rate should be close to zero. Divide by F to get the relative imbalance, as in the
-course code. Its size depends on how well the iterations have converged (with
-ε < 10⁻³, expect around 10⁻³).
-
-To split each boundary into in- and outgoing parts (Din, Dout), sum the positive and
-negative face values of the raw files. The coded `courseResidual` function object
-(Section 10) already computes F this way and can easily print Din, Dout, Sin and Sout
-too.
-
-### Monitored temperature
-
-The temperature in the cell that contains a point, after each iteration:
-```cpp
-probes
-{
-    type            probes;
-    libs            (sampling);
-    fields          (T);
-    probeLocations
-    (
-        (0.43 0.43 0.5)      // z inside the mesh (thickness 1)
-    );
-}
-```
-Output: `postProcessing/probes/0/T`. Put this in `controlDict` (not in the
-post-processing dictionary) to get the history over the iterations. A point exactly
-on a mesh line is ambiguous (two cells contain it), so choose a point inside a cell.
-This is also what the course code does: it monitors a node.
-
-### Profiles along lines (mesh study)
-
-```cpp
-centreline
-{
-    type            sets;
-    libs            (sampling);
-    interpolationScheme cellPoint;
-    setFormat       raw;
-    fields          (T);
-    sets
+    conductivity
     {
-        horizontal
+        type            exprField;
+        libs            (fieldFunctionObjects);
+        field           DT;
+        action          modify;
+        variables       ("L = 1.5" "T1 = 10");
+        expression      "(pos().x() > 0.7 && pos().x() < 1.1 && pos().y() > 0.3 && pos().y() < 0.4) ? 0.01 : 2*(1 + 10*pos().x()/L + 20*T/T1)";
+        writeControl    writeTime;
+    }
+    #include "courseResidual"
+    probes
+    {
+        type            probes;
+        libs            (sampling);
+        fields          (T);
+        probeLocations
+        (
+            (0.645 0.215 #eval{0.5*$thickness})
+            (1.155 0.385 #eval{0.5*$thickness})
+        );
+    }
+    TminMax
+    {
+        type            fieldMinMax;
+        libs            (fieldFunctionObjects);
+        executeControl  writeTime;
+        writeControl    writeTime;
+        fields          (T);
+        location        true;
+    }
+    gradT
+    {
+        type            grad;
+        libs            (fieldFunctionObjects);
+        executeControl  writeTime;
+        writeControl    writeTime;
+        field           T;
+        result          gradT;
+    }
+    kGradT
+    {
+        type            multiply;
+        libs            (fieldFunctionObjects);
+        executeControl  writeTime;
+        writeControl    writeTime;
+        fields          (DT gradT);
+        result          kGradT;
+    }
+    heatRateSouth
+    {
+        type            surfaceFieldValue;
+        libs            (fieldFunctionObjects);
+        executeControl  writeTime;
+        writeControl    writeTime;
+        regionType      patch;
+        name            south;
+        operation       areaNormalIntegrate;
+        fields          (kGradT);
+        writeFields     true;
+        surfaceFormat   raw;
+        scaleFactor     #eval{1/$thickness};   // per unit depth
+    }
+    heatRateEast    { $heatRateSouth;  name east;  }
+    heatRateNorth   { $heatRateSouth;  name north; }
+    heatRateWest    { $heatRateSouth;  name west;  }
+    b
+    {
+        type            exprField;
+        libs            (fieldFunctionObjects);
+        executeControl  writeTime;
+        writeControl    writeTime;
+        field           b;
+        variables       ("c1 = 20" "c2 = 0.2");
+        expression      "15*(c1 - c2*T*T)";
+    }
+    sourceHeatRate
+    {
+        type            volFieldValue;
+        libs            (fieldFunctionObjects);
+        executeControl  writeTime;
+        writeControl    writeTime;
+        regionType      all;
+        operation       volIntegrate;
+        fields          (b);
+        writeFields     false;
+        scaleFactor     #eval{1/$thickness};   // per unit depth
+    }
+    centreline
+    {
+        type            sets;
+        libs            (sampling);
+        executeControl  writeTime;
+        writeControl    writeTime;
+        interpolationScheme cellPoint;
+        setFormat       raw;
+        fields          (T);
+        sets
         {
-            type    face;           // one point at each crossed face
-            axis    x;
-            start   (0 0.5 0.5);
-            end     (1 0.5 0.5);
+            horizontal
+            {
+                type    face;
+                axis    x;
+                start   (0 0.25 #eval{0.5*$thickness});
+                end     (1.5 0.25 #eval{0.5*$thickness});
+            }
         }
     }
 }
 ```
-Output: `postProcessing/centreline/<time>/horizontal_T.xy`. Use `type uniform;` with
-`nPoints 100;` for equidistant points instead.
+- **`libs (thermoTools)`** loads the library with the boundary condition `externalWallHeatFluxTemperature` (Section 4).
+- **`thickness`** is the mesh thickness in z, the same as `D` in `system/blockMeshDict` (Section 3). It is used below as `$thickness`: `#eval{0.5*$thickness}` puts the monitoring points and the centreline in the middle of the mesh in z, and `scaleFactor #eval{1/$thickness}` divides the heat rates by the thickness, to get them per unit depth.
+- **Iterations.** `deltaT 1` and `endTime 10000` give at most 10000 iterations. The results are written at the end, either when `courseResidual` stops the run or after the last iteration.
+- **`functions`** are function objects, which are executed after each iteration, in the order they are listed:
+  - `conductivity` updates DT in the cells from the latest T. `action modify` changes the existing field `DT`. `writeControl writeTime` makes it write DT only at the end.
+  - `#include "courseResidual"` includes the file of Section 8. It comes after `conductivity`, so that it uses the latest DT.
+  - `probes` writes the temperature at the monitoring points after each iteration. It gives the temperature in the cell that contains the point. Points exactly on a mesh line are ambiguous, so the points are chosen inside cells.
+  - The others are only executed at the end (`executeControl writeTime`):
+    - `TminMax` gives the minimum and maximum temperature, including the boundary values.
+    - `gradT` and `kGradT` compute ∇T and k∇T. The heat flux is q = −k∇T. At the boundary faces, the normal component of `gradT` is the face-normal gradient (T_b − T_P)/δ.
+    - `heatRateSouth`, … integrate k∇T·n over each boundary, which is the heat rate into the domain (n points out of the domain). `heatRateEast { $heatRateSouth; name east; }` copies all entries of `heatRateSouth`, except `name`.
+    - `b` and `sourceHeatRate` evaluate the source term with the final temperature and integrate it over the domain.
+    - `centreline` writes the temperature along the line y = H/2, at each crossed face, for the mesh study.
 
-### Mesh study
 
-Copy the case, change the mesh (cell numbers in `blockMeshDict`, or another mesh
-from the mesh generator), and rerun. Compare the monitored temperatures, extreme
-values, boundary heat rates and profiles from the files above. The `checkMesh` log
-gives the number of cells, the minimum and maximum cell volumes (cell size times
-thickness in 2D) and the maximum aspect ratio. The convergence history (number of iterations to reach ε <
-resTol) can also be compared between meshes, e.g. equidistant vs non-equidistant
-with the same number of cells.
+## 10. Run the case
 
-
-## 12. Putting it together: Allrun
-
-Files of a case like case 1, without compiled code:
-```
-0.orig/T                          boundary conditions (Sections 3, 4, 8), internalField 0
-0.orig/DT                         conductivity field (Sections 1, 5, 6)
-constant/polyMesh/                from blockMesh or the mesh generator
-system/blockMeshDict              (Section 2)
-system/controlDict                steady iterations, function objects (readC, conductivity,
-                                  courseResidual, probes, solverInfo)
-system/fvSchemes                  steadyState, Gauss linear corrected
-system/fvSolution                 GaussSeidel sweeps or PCG, residualControl
-system/fvOptions                  source term (Section 7)
-system/setExprFieldsDict          initial conductivity in the cells
-system/setExprBoundaryFieldsDict  Dirichlet profiles and boundary conductivity (if used)
-system/courseResidual             course residual (Section 10, optional, compiled)
-system/postProcessDict            heat flux, heat rates, profiles (Section 11)
-```
-`Allrun`:
+Replace the content of `Allrun` with:
 ```sh
 #!/bin/sh
 cd "${0%/*}" || exit                                # Run from this directory
@@ -950,167 +616,154 @@ cd "${0%/*}" || exit                                # Run from this directory
 restore0Dir
 runApplication blockMesh
 runApplication checkMesh
-
-# Cell centres, for the convective boundary condition (Section 8)
-runApplication postProcess -func writeCellCentres -time 0
-
-# Dirichlet profiles and boundary conductivity (Sections 3 and 5)
-runApplication setExprBoundaryFields
-# Initial conductivity in the cells (Sections 5 and 6)
 runApplication setExprFields
-
 runApplication $(getApplication)
-
-# Heat flux, heat rates, profiles (Section 11)
-runApplication -s post $(getApplication) -postProcess -dict system/postProcessDict -latestTime
 ```
-`Allclean`:
+Replace the content of `Allclean` with:
 ```sh
 #!/bin/sh
-cd "${0%/*}" || exit
-. ${WM_PROJECT_DIR:?}/bin/tools/CleanFunctions
-cleanCase0      # removes time directories, 0/, logs, postProcessing, dynamicCode
-                # and constant/polyMesh
+cd "${0%/*}" || exit                                # Run from this directory
+. ${WM_PROJECT_DIR:?}/bin/tools/CleanFunctions      # Tutorial clean functions
+
+cleanDynamicCode() { :; }                           # keep the compiled code
+cleanCase0
 ```
-Remove the lines you don't need, e.g. `writeCellCentres` if there is no convective
-boundary. `cleanCase0` also deletes `constant/polyMesh`. If you use a mesh from the
-mesh generator instead of `blockMesh`, keep it as `constant/polyMesh.orig` and
-replace `runApplication blockMesh` in `Allrun` with
-`cp -r constant/polyMesh.orig constant/polyMesh`.
+`cleanCase0` removes everything that `Allrun` creates. The line before it makes it keep the compiled code in the directory `dynamicCode`, so that it doesn't have to be compiled again in the next run. The code is compiled again automatically if you change it.
+
+Run the case. The first time, it takes some additional time, since the code in `system/fvOptions` and `system/courseResidual` is compiled:
+```sh
+./Allrun
+```
+The commands in `Allrun`:
+- `restore0Dir` copies `0.orig/` to `0/`.
+- `blockMesh` and `checkMesh` create and check the mesh.
+- `setExprFields` sets DT in the cells from the initial guess of the temperature.
+- `$(getApplication)` runs the solver given in `controlDict`, i.e. `laplacianFoam`.
+
+Each command writes its output to a log file, e.g. `log.laplacianFoam`. Check the convergence:
+```sh
+grep epsilon log.laplacianFoam
+```
+ε should go below 0.001 after about 45 iterations, and the last time directory is then written. To run the case again, first remove all results with:
+```sh
+./Allclean
+```
+
+
+## 11. Look at the results
+
+**Heat rates and energy balance.** Print the heat rates through the boundaries and from the source term:
+```sh
+grep 'areaNormalIntegrate(\|volIntegrate(' log.laplacianFoam
+```
+You should get approximately:
+```
+    areaNormalIntegrate(south) of kGradT = 2961
+    areaNormalIntegrate(east) of kGradT = 1333
+    areaNormalIntegrate(north) of kGradT = -3759
+    areaNormalIntegrate(west) of kGradT = 0
+    volIntegrate(region0) of b = -529
+```
+Positive values are into the domain, in W/m. The sum, about 5 W/m, is the global imbalance. Divided by F (approximately the sum of the positive boundary heat rates, see Section 8), it is about 0.001, as expected with ε < 0.001.
+
+**Files.** All results are written to `postProcessing/`:
+
+| File | Content |
+|---|---|
+| `probes/0/T` | T at the monitoring points, after each iteration |
+| `TminMax/0/fieldMinMax.dat` | minimum and maximum T, and their locations |
+| `heatRateSouth/0/surfaceFieldValue.dat`, … | heat rate through each boundary |
+| `heatRateSouth/surface/<time>/kGradT_patch_south.raw`, … | k∇T at each boundary face: x, y, z and the three components. The wall heat flux out of the domain is −k∇T·n. On `south`, n = (0, −1, 0), so it is the y component of k∇T. |
+| `sourceHeatRate/0/volFieldValue.dat` | heat rate from the source term |
+| `centreline/<time>/horizontal_T.xy` | x and T along y = H/2 |
+
+`<time>` is the number of the last iteration. The files are text files that you can plot, for example with Python.
+
+**ParaView.** Create an empty file that tells ParaView that this is an OpenFOAM case:
+```sh
+touch Task1.foam
+```
+Open `Task1.foam` in ParaView, as in [02_Install_ParaView_Windows.md](02_Install_ParaView_Windows.md), and click *Apply*. Go to the last time.
+- **Temperature.** Colour by `T`. Tick *Create cell-to-point filtered data* in *Properties* and click *Apply*, to get smooth colours from values interpolated to the mesh points. Use the *Mesh Regions* list to also show the boundary patches, which have the boundary values.
+- **Heat-flux vectors.** Use the filter *Calculator* with the expression `-kGradT` (this is q), and then the filter *Glyph* to show arrows.
+- **Conductivity.** Colour by `DT` to see k, including the region.
+
+**Mesh study.** Copy the case and remove the results in the copy:
+```sh
+cp -r $FOAM_RUN/Task1 $FOAM_RUN/Task1_60x40
+cd $FOAM_RUN/Task1_60x40
+./Allclean
+```
+Change the number of cells in `system/blockMeshDict` to `(60 40 1)`, and run `./Allrun`. Compare the monitored temperatures, the extreme values, the heat rates and the centreline profiles. The `checkMesh` log, `log.checkMesh`, gives the number of cells and the minimum and maximum cell volumes.
+
+
+## 12. Set up your own case
+
+Copy the tutorial case and remove the results in the copy, here for case 5:
+```sh
+cp -r $FOAM_RUN/Task1 $FOAM_RUN/Case_05
+cd $FOAM_RUN/Case_05
+./Allclean
+```
+Change the building blocks to those of your case, and run `./Allrun`. The table shows which files to change. The monitoring points of all cases are (0.43L, 0.43H) and (0.77L, 0.77H).
+
+| Building block | What to change |
+|---|---|
+| Domain L, H | `L` and `H` in `system/blockMeshDict`, and in the `variables` of all expressions. The monitoring points in `probes` and the line in `centreline` in `system/controlDict`. |
+| Constant Dirichlet value | In `0.orig/T`: `type fixedValue; value uniform 10;` |
+| Dirichlet value varying with x or y | In `0.orig/T`: `uniformFixedValue` with your formula in `expression`, as on `east` and `north` |
+| dT/dn = 0 | In `0.orig/T`: `type zeroGradient;` |
+| Convective boundary | In `0.orig/T`: copy the `south` entry to the boundary, and set T∞ in `Ta` and `value`, and h in `h` |
+| Conductivity | The expressions in `system/setExprFieldsDict`, `system/controlDict` (`conductivity`) and `0.orig/DT`. Examples below. |
+| Constant source b | In `system/fvOptions`: `const scalar Su = -1.5*V[celli];` (your value of b) and `const scalar Sp = 0;`. The same value in `b` in `system/controlDict`. |
+| Quadratic source | `c1` and `c2` in `system/fvOptions`, and in the `variables` of `b` in `system/controlDict` |
+
+Conductivity expressions of the 40 cases (`x` is `pos().x()` and `y` is `pos().y()`):
+
+| k in the task | Expression |
+|---|---|
+| 5(1 + 100x/L) | `5*(1 + 100*pos().x()/L)` |
+| 0.01 in 0.7 < x < 1.1, 0.3 < y < 0.4, 20 elsewhere | `(pos().x() > 0.7 && pos().x() < 1.1 && pos().y() > 0.3 && pos().y() < 0.4) ? 0.01 : 20` in the cells, `20` at the boundaries |
+| 2(1 + 20T/T1) | `2*(1 + 20*T/T1)` |
+| 16(y/H + 30T/T1) | `16*(pos().y()/H + 30*T/T1)` |
+
+Add the constants that an expression uses (`L`, `H`, `T1`) to its `variables`, and remove the ones it doesn't use. In the cases with a region (cases 6–10 and 26–30), the source term is zero. Use the constant source row with b = 0.
+
+**The course meshes.** To get exactly the same mesh as in your Python code (for example the validation mesh), let the course mesh generator write the mesh in OpenFOAM format (`constant/polyMesh`). Save it in the case as `constant/polyMesh.orig`. Set `thickness` in `system/controlDict` to the thickness of the mesh (0.1 by default). In `Allrun`, replace the lines `runApplication blockMesh` and `runApplication checkMesh` with:
+```sh
+cp -r constant/polyMesh.orig constant/polyMesh
+runApplication checkMesh
+```
+`Allclean` removes `constant/polyMesh`, but not `constant/polyMesh.orig`. If a side of the mesh is split into several patches (`south_0`, `south_1`, …), give the entries in `0.orig/T` and `0.orig/DT` names that match all of them, e.g. `"south.*"`.
 
 
 ## 13. Common errors
 
 | Message or symptom | Cause and fix |
 |---|---|
-| `Unknown fvOption type semiImplicitSource` | The type name includes the field type: `scalarSemiImplicitSource`. |
-| `Object C does not exist or wrong type in expression` | Write the cell centres to `0/` (`postProcess -func writeCellCentres -time 0`) and load them with the `readFields` function object (Section 8). |
-| `compound has already been transferred from token` | `setExprBoundaryFields` was used on a field whose patch entry is a pattern like `"(south\|east)"`. List the patches separately, or don't use the utility for that field. |
-| `Entry 'object' not found` | Broken `FoamFile` header, e.g. a missing `;` or line break. |
-| A new time directory every iteration | A function object writes a field every iteration. Add `writeControl writeTime;` to it. |
-| Compile errors in coded entries using `$name` | Only the dictionary entries of the coded object itself are available inside the code. Read them in `codeRead` (Section 10). |
-| No `flux`/`gradTx` in the last time directory | The run stopped with `writeAndEnd()` or `residualControl`. Compute them with the function objects in Section 11. |
-| Probe value jumps between meshes | The probe point lies on a mesh line. Move it slightly into a cell. |
-| Heat rates a factor 10 too small or large | Mesh thickness is not 1. Divide by the thickness. |
-| The case diverges with a temperature-dependent source | The source is treated explicitly, or Sp > 0. Linearize as in Section 7 with Sp ≤ 0. |
+| `Unknown patchField type externalWallHeatFluxTemperature` | The library is not loaded. Check `libs (thermoTools);` in `system/controlDict`. |
+| `Entry 'object' not found` | Broken `FoamFile` header, e.g. a missing `;`. |
+| `Floating point exception` after some iterations, ε grows | The iterations diverge. Check that Sp ≤ 0 and k > 0. |
+| The monitored temperature jumps between meshes | The monitoring point is on a mesh line. Move it slightly into a cell. |
+| Heat rates a factor 10 too small or large | `thickness` in `system/controlDict` is not the thickness of the mesh. |
+
+
+## The finished case
+
+The finished case of this tutorial is in `Task_1_OpenFOAM/Task1` of the course project. Copy it to your run directory, with another name than your own case:
+```sh
+cp -r ~/MTF073_CFD_Tasks/Task_1_OpenFOAM/Task1 $FOAM_RUN/Task1_finished
+```
+Run it as in Section 10, with `./Allrun` in `$FOAM_RUN/Task1_finished`. To find a mistake in your own case, compare a file with the same file in the finished case, e.g.:
+```sh
+diff $FOAM_RUN/Task1/0.orig/T $FOAM_RUN/Task1_finished/0.orig/T
+```
+`diff` prints the lines that differ, and nothing if the files are the same.
+
 
 ## Next
 
-Now you can continue with [Task_1_02_all_cases.md](Task_1_02_all_cases.md).
-
-
-## Appendix A: Other options, also for older OpenFOAM versions
-
-The setup without any compiled code needs **v2306 or newer**; it has been tested with
-v2312 and v2412. Older versions (v2012 and newer) need the coded alternatives shown in
-some sections. These are compiled automatically at run time. The openfoam.org versions
-(OpenFOAM-11, 12, …) use different syntax and are not covered.
-
-### A.1 Spatially varying temperature (Section 3)
-
-The `exprFixedValue` condition can be used instead of `uniformFixedValue` with an
-expression. It still works in v2606, but is deprecated since v2212. Another option is
-`codedFixedValue`, which needs compiling. It also works in v2606, but the setup in
-Section 3 needs no compiling.
-
-### A.2 Temperature-dependent conductivity (Section 6)
-
-Before v2206, k can be updated in `codeCorrect` of a `scalarCodedSource` in
-`system/fvOptions`. This also works in v2606, but the setup in Section 6 needs no
-compiling. `codeCorrect` is called after each
-solution of T:
-```cpp
-codeCorrect
-#{
-    volScalarField& DT =
-        const_cast<volScalarField&>(mesh_.lookupObject<volScalarField>("DT"));
-    forAll(DT, celli)
-    {
-        DT[celli] = 2*(1 + 20*fld[celli]/10);
-    }
-    forAll(DT.boundaryField(), patchi)
-    {
-        const scalarField& Tb = fld.boundaryField()[patchi];
-        scalarField& DTb = DT.boundaryFieldRef()[patchi];
-        forAll(DTb, facei)
-        {
-            DTb[facei] = 2*(1 + 20*Tb[facei]/10);
-        }
-    }
-#};
-```
-(`fld` is the solved field T.) A complete `scalarCodedSource` also needs the entries
-`codeAddSup` and `codeConstrain`, which can be empty (see [A.3](#a3-temperature-dependent-source-section-7)).
-
-### A.3 Temperature-dependent source (Section 7)
-
-Expressions in `scalarSemiImplicitSource` need v2206 or newer. In older versions, use a
-coded fvOption instead. This also works in v2606, but the setup in Section 7 needs no
-compiling. `codeAddSup` adds the linearized source to the
-matrix. The matrix stores its right-hand side with the opposite sign, hence the
-`-=`:
-```cpp
-caseProperties
-{
-    type            scalarCodedSource;
-    name            caseProperties;
-    selectionMode   all;
-    fields          (T);
-
-    codeAddSup
-    #{
-        const scalarField& V = mesh_.V();
-        const scalarField& T = eqn.psi().primitiveField();
-        scalarField& diag = eqn.diag();
-        scalarField& source = eqn.source();
-        forAll(V, celli)
-        {
-            const scalar Sp = -30*0.2*max(T[celli], scalar(0));
-            const scalar Su = 15*(20 - 0.2*sqr(T[celli])) - Sp*T[celli];
-            diag[celli] += Sp*V[celli];
-            source[celli] -= Su*V[celli];
-        }
-    #};
-    codeCorrect
-    #{
-    #};
-    codeConstrain
-    #{
-    #};
-}
-```
-
-### A.4 Convective boundary conditions (Section 8)
-
-Before v2306, use `codedMixed` instead of `uniformMixed` with an expression (v2012
-and newer, no extra files needed). This also works in v2606, but the setup in
-Section 8 needs no compiling. `codedMixed` has direct access to the patch quantities. `deltaCoeffs()` is 1/δ:
-```cpp
-south
-{
-    type            codedMixed;
-    name            convective_south;
-    refValue        uniform 35;
-    refGradient     uniform 0;
-    valueFraction   uniform 1;
-    value           uniform 35;
-    code
-    #{
-        const scalar h = 1000;
-        const scalarField& k =
-            this->patch().template lookupPatchField<volScalarField, scalar>("DT");
-        this->refValue() = 35;
-        this->refGrad() = Zero;
-        this->valueFraction() = h/(h + k*this->patch().deltaCoeffs());
-    #};
-}
-```
-It is compiled the first time the case runs (into `dynamicCode/`, which takes about
-10–20 s).
-
-## Next
-
-Now you can continue with [Task_1_02_all_cases.md](Task_1_02_all_cases.md).
+Now you can continue with [Task_1_02_all_cases.md](Task_1_02_all_cases.md), which runs all 40 cases with ready-made scripts.
 
 ---
 

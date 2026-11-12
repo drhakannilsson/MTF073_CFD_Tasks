@@ -1,0 +1,136 @@
+FoamFile { version 2.0; format ascii; class dictionary; object controlDict; }
+
+application     laplacianFoam;
+
+thickness       0.1;            // mesh thickness in z
+
+libs            (thermoTools);
+
+
+startFrom       startTime;
+startTime       0;
+stopAt          endTime;
+endTime         10000;          // maximum number of iterations
+deltaT          1;              // one "time step" = one iteration
+
+writeControl    timeStep;
+writeInterval   10000;          // write only at the end
+purgeWrite      0;
+writeFormat     ascii;
+writePrecision  12;
+writeCompression off;
+timeFormat      general;
+timePrecision   8;
+runTimeModifiable false;
+
+functions
+{
+    conductivity
+    {
+        type            exprField;
+        libs            (fieldFunctionObjects);
+        field           DT;
+        action          modify;
+        variables       ("L = 1.5" "T1 = 10");
+        expression      "(pos().x() > 0.7 && pos().x() < 1.1 && pos().y() > 0.3 && pos().y() < 0.4) ? 0.01 : 2*(1 + 10*pos().x()/L + 20*T/T1)";
+        writeControl    writeTime;
+    }
+    #include "courseResidual"
+    probes
+    {
+        type            probes;
+        libs            (sampling);
+        fields          (T);
+        probeLocations
+        (
+            (0.645 0.215 #eval{0.5*$thickness})
+            (1.155 0.385 #eval{0.5*$thickness})
+        );
+    }
+    TminMax
+    {
+        type            fieldMinMax;
+        libs            (fieldFunctionObjects);
+        executeControl  writeTime;
+        writeControl    writeTime;
+        fields          (T);
+        location        true;
+    }
+    gradT
+    {
+        type            grad;
+        libs            (fieldFunctionObjects);
+        executeControl  writeTime;
+        writeControl    writeTime;
+        field           T;
+        result          gradT;
+    }
+    kGradT
+    {
+        type            multiply;
+        libs            (fieldFunctionObjects);
+        executeControl  writeTime;
+        writeControl    writeTime;
+        fields          (DT gradT);
+        result          kGradT;
+    }
+    heatRateSouth
+    {
+        type            surfaceFieldValue;
+        libs            (fieldFunctionObjects);
+        executeControl  writeTime;
+        writeControl    writeTime;
+        regionType      patch;
+        name            south;
+        operation       areaNormalIntegrate;
+        fields          (kGradT);
+        writeFields     true;
+        surfaceFormat   raw;
+        scaleFactor     #eval{1/$thickness};   // per unit depth
+    }
+    heatRateEast    { $heatRateSouth;  name east;  }
+    heatRateNorth   { $heatRateSouth;  name north; }
+    heatRateWest    { $heatRateSouth;  name west;  }
+    b
+    {
+        type            exprField;
+        libs            (fieldFunctionObjects);
+        executeControl  writeTime;
+        writeControl    writeTime;
+        field           b;
+        variables       ("c1 = 20" "c2 = 0.2");
+        expression      "15*(c1 - c2*T*T)";
+    }
+    sourceHeatRate
+    {
+        type            volFieldValue;
+        libs            (fieldFunctionObjects);
+        executeControl  writeTime;
+        writeControl    writeTime;
+        regionType      all;
+        operation       volIntegrate;
+        fields          (b);
+        writeFields     false;
+        scaleFactor     #eval{1/$thickness};   // per unit depth
+    }
+    centreline
+    {
+        type            sets;
+        libs            (sampling);
+        executeControl  writeTime;
+        writeControl    writeTime;
+        interpolationScheme cellPoint;
+        setFormat       raw;
+        fields          (T);
+        sets
+        {
+            horizontal
+            {
+                type    face;
+                axis    x;
+                start   (0 0.25 #eval{0.5*$thickness});
+                end     (1.5 0.25 #eval{0.5*$thickness});
+            }
+        }
+    }
+}

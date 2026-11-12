@@ -12,9 +12,7 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-// Temperature [K]. Initialized to 0 as in the course code.
-// Spatially varying Dirichlet values are set by setExprBoundaryFields
-// (see system/setExprBoundaryFieldsDict).
+// Temperature [K]. The initial guess is T = 0, as in the course code.
 
 dimensions      [0 0 0 1 0 0 0];
 

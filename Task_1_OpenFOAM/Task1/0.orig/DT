@@ -1,0 +1,23 @@
+FoamFile { version 2.0; format ascii; class volScalarField; object DT; }
+
+dimensions      [0 2 -1 0 0 0 0];
+internalField   uniform 2;
+
+boundaryField
+{
+    "(south|east|north|west)"
+    {
+        type            uniformFixedValue;
+        uniformValue
+        {
+            type        expression;
+            variables   ("L = 1.5" "T1 = 10");
+            expression  #{ 2*(1 + 10*pos().x()/L + 20*T/T1) #};
+        }
+        value           uniform 2;
+    }
+    frontAndBack
+    {
+        type            empty;
+    }
+}

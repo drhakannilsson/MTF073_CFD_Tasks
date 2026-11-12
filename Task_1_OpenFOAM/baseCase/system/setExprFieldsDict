@@ -11,7 +11,10 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-// Sets the initial conductivity in the cells, from the initial temperature.
+// Sets the conductivity k (the field DT) in the cells once, before the
+// simulation starts, from the initial guess of the temperature (T = 0).
+// During the simulation, it is updated by the function object conductivity
+// in system/controlDict, with the same expression.
 
 #include "caseParameters"
 

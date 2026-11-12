@@ -11,9 +11,8 @@ style as the course Python code. You can browse them in a web browser.
 ## Requirements
 
 - OpenFOAM-v2606 from openfoam.com (ESI-OpenCFD), installed as in
-  [01_Install_OpenFOAM-v2606_WSL.md](../01_Install_OpenFOAM-v2606_WSL.md). Older versions
-  from v2012 also work (tested with v2012, v2312 and v2412). The versions from
-  openfoam.org (OpenFOAM-12, 13, …) are **not** supported.
+  [01_Install_OpenFOAM-v2606_WSL.md](../01_Install_OpenFOAM-v2606_WSL.md). The versions
+  from openfoam.org (OpenFOAM-12, 13, …) are **not** supported.
 - A C++ compiler, which OpenFOAM uses to compile the case-specific code at run time
   (this is normally available wherever OpenFOAM is installed).
 - Python 3 with NumPy and Matplotlib.
@@ -122,24 +121,30 @@ as numbers.
 **Parameters.** `system/caseParameters` contains L, H, resTol, nLinSolIter and maxIter,
 and a description of the case.
 
-**Boundary conditions** (`0.orig/T`; `0/T` is created from it by `./Allrun`):
-- Dirichlet: `fixedValue`. The spatially varying values are set with the utility
-  `setExprBoundaryFields` (see `system/setExprBoundaryFieldsDict`).
-- Homogeneous Neumann: `zeroGradient`.
-- Convective: `codedMixed`. The boundary value is a weighted mean of T∞ and the
-  temperature in the adjacent cell, T_b = f T∞ + (1 − f) T_P, with
-  f = h/(h + k_b/δ), where δ is the distance from the cell centre to the face. This is
-  the heat-flux balance h(T∞ − T_b) = k_b(T_b − T_P)/δ.
+The cases are set up in the same way as in
+[Task_1_01_OpenFOAM_tutorial.md](../Task_1_01_OpenFOAM_tutorial.md):
 
-**Conductivity and source term** (`system/fvOptions`, compiled at run time):
-- k is updated from the latest temperature after each iteration, in the cells and at
-  the boundary faces. The initial k (computed from the initial T = 0) is set by
-  `setExprFields` and `setExprBoundaryFields`.
+**Boundary conditions** (`0.orig/T`; `0/T` is created from it by `./Allrun`):
+- Dirichlet: `uniformFixedValue` with an expression for T.
+- Homogeneous Neumann: `zeroGradient`.
+- Convective: `externalWallHeatFluxTemperature` with `mode coefficient`. The boundary
+  value is a weighted mean of T∞ and the temperature in the adjacent cell,
+  T_b = f T∞ + (1 − f) T_P, with f = h/(h + k_b/δ), where δ is the distance from the
+  cell centre to the face. This is the heat-flux balance h(T∞ − T_b) = k_b(T_b − T_P)/δ.
+
+**Conductivity** (the field `DT`):
+- At the boundary faces: `uniformFixedValue` with an expression for k, evaluated with
+  the boundary temperature (`0.orig/DT`).
+- In the cells: set by `setExprFields` before the simulation starts, from the initial
+  guess T = 0 (`system/setExprFieldsDict`), and updated after each iteration by the
+  function object `conductivity` (`system/controlDict`), with the same expression.
 - The face conductivity is linearly interpolated between the cell centres
-  (`laplacianSchemes`, `Gauss linear`). You can try `Gauss harmonic` instead for the
-  region-dependent conductivity of cases 6–10 and 26–30.
-- The source term is linearized as b = Su + Sp·T around the latest temperature, with
-  Sp ≤ 0, and treated implicitly.
+  (`laplacianSchemes`, `Gauss linear orthogonal`).
+
+**Source term** (`system/fvOptions`, a `scalarCodedSource` compiled at run time): as in
+the course, b·ΔV = Su + Sp·T_P with Su and Sp including the cell volume. For
+b = 15(c1 − c2T²), Su = 15c1ΔV and Sp = −15c2T\*ΔV, where T\* is the latest
+temperature. Su goes to the right-hand side and −Sp to a_P.
 
 **Numerical settings.**
 - `--settings course` (default) mimics the course code. Each iteration does
@@ -147,8 +152,7 @@ and a description of the case.
   `system/fvSolution`). The iterations stop when the normalized residual is below
   `resTol` (default 0.001).
 - `--settings optimal` solves the linear system to machine accuracy in each iteration
-  with the conjugate gradient method (`PCG`, the matrix is symmetric) and uses
-  `orthogonal` face gradients (the meshes are orthogonal). Linear cases then converge
+  with the conjugate gradient method (`PCG`, the matrix is symmetric). Linear cases then converge
   in one iteration, and nonlinear cases in a few iterations.
 
 **Convergence monitoring** (`system/courseResiduals`, a coded function object that is
@@ -190,6 +194,7 @@ The standard function objects `probes` (monitored temperatures) and `solverInfo`
 | `caseDefinitions.py` | the 40 cases (domain, boundary conditions, k, b, monitoring points) |
 | `npzToFoam.py` | conversion of `.npz` meshes to OpenFOAM, refinement of meshes |
 | `baseCase/` | the base case. `@@NAME@@` placeholders are replaced by `t1foam.py` |
+| `Task1/` | the finished case of `Task_1_01_OpenFOAM_tutorial.md` |
 | `t1post/foamReader.py` | reads the OpenFOAM results into node arrays as in the course code |
 | `t1post/plots.py` | figures |
 | `t1post/postProcess.py` | post-processing of all runs of a case |

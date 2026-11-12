@@ -104,7 +104,7 @@ def get_args():
                    help="Gauss-Seidel sweeps per iteration, course settings (default 10)")
     p.add_argument('--maxIter', type=int, default=100000, help="max number of iterations")
     p.add_argument('--thickness', type=float, default=npzToFoam.DEFAULT_THICKNESS,
-                   help="mesh thickness in z (default 1, results are per unit depth anyway)")
+                   help="mesh thickness in z (default 0.1, results are per unit depth anyway)")
     p.add_argument('-j', '--jobs', type=int, default=1, help="number of parallel runs")
     p.add_argument('--foam', default=None,
                    help="OpenFOAM installation to source, e.g. /OpenFOAM/OpenFOAM-v2412")
@@ -224,11 +224,12 @@ def cpp_source(case):
     btype, bpar = case['b']
     if btype == 'constant':
         return (f"// b = {bpar['b']:g}\n"
-                f"            const scalar Su = {fmt(bpar['b'])};\n"
+                f"            const scalar Su = {fmt(bpar['b'])}*V[celli];\n"
                 f"            const scalar Sp = 0;")
-    return ("// b = 15(c1 - c2 T^2), linearized around the latest T\n"
-            "            const scalar Sp = -30.0*c2*max(T, scalar(0));\n"
-            "            const scalar Su = 15.0*(c1 - c2*T*T) - Sp*T;")
+    return ("// b = 15(c1 - c2 T^2), split as in the course: Su = 15 c1 dV,\n"
+            "            // Sp = -15 c2 T dV (T = latest temperature, kept >= 0)\n"
+            "            const scalar Su = 15.0*c1*V[celli];\n"
+            "            const scalar Sp = -15.0*c2*max(T, scalar(0))*V[celli];")
 
 
 def expr_variables(case, patch=False):
@@ -246,9 +247,15 @@ def t_boundary_entries(case, patches):
         if bc[0] == 'dirichlet':
             out.append(f"""    {p}
     {{
-        // Boundary {b}: T = {bc[1]}  (values set by setExprBoundaryFields)
-        type            fixedValue;
-        value           uniform 0;
+        // Boundary {b}: T = {bc[1]}
+        type            uniformFixedValue;
+        uniformValue
+        {{
+            type        expression;
+            variables   ({expr_variables(case)});
+            expression  #{{ {expr(bc[1])} #}};
+        }}
+        value           uniform 0;      // placeholder, e.g. for ParaView
     }}""")
         elif bc[0] == 'neumann':
             out.append(f"""    {p}
@@ -261,60 +268,34 @@ def t_boundary_entries(case, patches):
             out.append(f"""    {p}
     {{
         // Boundary {b}: convective, -k dT/dn = h (T - Tinf), h = {h:g}, Tinf = {tinf}
-        // Mixed condition with refGradient = 0: T_b = f*Tinf + (1 - f)*T_P, where
-        // f = h/(h + k_b/delta) and delta = distance from cell centre P to the face.
-        // This is h (Tinf - T_b) = k_b (T_b - T_P)/delta, i.e. the heat flux balance.
-        type            codedMixed;
-        name            convective_{p};
-        refValue        uniform {fmt(float(tinf))};
-        refGradient     uniform 0;
-        valueFraction   uniform 1;
-        value           uniform {fmt(float(tinf))};
-        code
-        #{{
-            const scalar h = {fmt(h)};
-            const scalar Tinf = {fmt(float(tinf))};
-            const scalarField& k =
-                this->patch().template lookupPatchField<volScalarField, scalar>("DT");
-            this->refValue() = Tinf;
-            this->refGrad() = Zero;
-            this->valueFraction() = h/(h + k*this->patch().deltaCoeffs());
-        #}};
+        // Mixed condition: T_b = f*Tinf + (1 - f)*T_P, where f = h/(h + k_b/delta)
+        // and delta = distance from cell centre P to the face. This is the heat
+        // flux balance h (Tinf - T_b) = k_b (T_b - T_P)/delta. k_b is taken from
+        // the boundary values of DT.
+        type            externalWallHeatFluxTemperature;
+        mode            coefficient;
+        Ta              constant {fmt(float(tinf))};
+        h               uniform {fmt(h)};
+        kappaMethod     lookup;
+        kappa           DT;
+        value           uniform {fmt(float(tinf))};   // placeholder, e.g. for ParaView
     }}""")
     return '\n'.join(out)
 
 
-def dt_boundary_entries(patches):
+def dt_boundary_entries(case, patches):
     return '\n'.join(f"""    {p}
     {{
-        type            calculated;
-        value           uniform 1;
-    }}""" for p in patches)
-
-
-def setexpr_boundary(case, patches):
-    t_items, dt_items = [], []
-    for p in patches:
-        b = boundary_of(p)
-        bc = case['bc'][b]
-        if bc[0] == 'dirichlet':
-            t_items.append(f"""        {{
-            // Boundary {b}: T = {bc[1]}
-            patch       {p};
-            target      value;
-            variables   ({expr_variables(case)});
-            expression  #{{ {expr(bc[1])} #}};
-        }}""")
-        dt_items.append(f"""        {{
-            patch       {p};
-            target      value;
+        // k at the boundary faces, from the boundary temperature
+        type            uniformFixedValue;
+        uniformValue
+        {{
+            type        expression;
             variables   ({expr_variables(case)});
             expression  #{{ {expr(cd.K_MODELS[case['k']]['code'])} #}};
-        }}""")
-    return ("dirichletTemperatures\n{\n    field       T;\n    expressions\n    (\n"
-            + '\n'.join(t_items) + "\n    );\n    keepPatches true;\n}\n\n"
-            "conductivity\n{\n    field       DT;\n    readFields  (T);\n    expressions\n    (\n"
-            + '\n'.join(dt_items) + "\n    );\n    keepPatches true;\n}\n")
+        }}
+        value           uniform 1;      // placeholder, e.g. for ParaView
+    }}""" for p in patches)
 
 
 def substitute(path, subs):
@@ -357,16 +338,13 @@ def setup_run(n, spec, args):
         'RESTOL': f"{args.resTol:g}", 'NLINSOLITER': args.nLinSolIter,
         'MAXITER': args.maxIter, 'DESCRIPTION': desc,
         'CONSTANTS': cpp_constants(case),
-        'KCODE': cd.K_MODELS[case['k']]['code'],
         'SOURCECODE': cpp_source(case),
         'KEXPR': expr(cd.K_MODELS[case['k']]['code']),
         'EXPRVARIABLES': expr_variables(case),
         'TBOUNDARY': t_boundary_entries(case, patches),
-        'DTBOUNDARY': dt_boundary_entries(patches),
-        'SETEXPRBOUNDARY': setexpr_boundary(case, patches),
+        'DTBOUNDARY': dt_boundary_entries(case, patches),
         'PROBELOCATIONS': '\n'.join(f"        ({fmt(px)} {fmt(py)} {fmt(zmid)})"
                                     for px, py in case['probes']),
-        'SNGRAD': 'orthogonal' if args.settings == 'optimal' else 'corrected',
         'CASENAME': f"case {n}, mesh {mname}, {args.settings} settings",
     }
     for root, _, files in os.walk(run_dir):
@@ -409,7 +387,7 @@ def check_foam(args):
     version = out[0]
     if not version.startswith('v'):
         print(f"WARNING: OpenFOAM-{version} is not an ESI-OpenCFD version (vYYMM). "
-              "These cases are made for OpenFOAM v2012-v2606 and may not work.")
+              "These cases are made for OpenFOAM-v2606 and may not work.")
     return version
 
 

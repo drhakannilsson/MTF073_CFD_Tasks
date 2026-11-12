@@ -1,0 +1,48 @@
+FoamFile { version 2.0; format ascii; class volScalarField; object T; }
+
+dimensions      [0 0 0 1 0 0 0];
+internalField   uniform 0;
+
+boundaryField
+{
+    south
+    {
+        type            externalWallHeatFluxTemperature;
+        mode            coefficient;
+        Ta              constant 25;
+        h               uniform 1000;
+        kappaMethod     lookup;
+        kappa           DT;
+        value           uniform 25;
+    }
+    east
+    {
+        type            uniformFixedValue;
+        uniformValue
+        {
+            type        expression;
+            variables   ("H = 0.5");
+            expression  #{ 10 + 20*sin(pi()*pos().y()/H) #};
+        }
+        value           uniform 10;
+    }
+    north
+    {
+        type            uniformFixedValue;
+        uniformValue
+        {
+            type        expression;
+            variables   ("L = 1.5");
+            expression  #{ 5*(1 + pos().x()/L) #};
+        }
+        value           uniform 5;
+    }
+    west
+    {
+        type            zeroGradient;
+    }
+    frontAndBack
+    {
+        type            empty;
+    }
+}

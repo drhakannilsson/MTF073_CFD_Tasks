@@ -1,0 +1,65 @@
+courseResidual
+{
+    type            coded;
+    libs            (utilityFunctionObjects);
+    name            courseResidual;
+    resTol          1e-3;
+
+    codeInclude
+    #{
+        #include "fvCFD.H"
+        #include "fvOptions.H"
+    #};
+    codeOptions
+    #{
+        -I$(LIB_SRC)/finiteVolume/lnInclude \
+        -I$(LIB_SRC)/meshTools/lnInclude
+    #};
+    codeLibs
+    #{
+        -lfiniteVolume \
+        -lmeshTools
+    #};
+    codeData
+    #{
+        scalar resTol_;
+    #};
+    codeRead
+    #{
+        resTol_ = dict.get<scalar>("resTol");
+    #};
+    codeExecute
+    #{
+        volScalarField& T = const_cast<volScalarField&>
+            (mesh().lookupObject<volScalarField>("T"));
+        const volScalarField& DT = mesh().lookupObject<volScalarField>("DT");
+
+        // The discretized equation for the latest T, as in laplacianFoam
+        fv::options& fvOptions = fv::options::New(mesh());
+        tmp<fvScalarMatrix> tSource = fvOptions(T);
+        fvScalarMatrix TEqn(-fvm::laplacian(DT, T));
+        TEqn -= tSource();
+
+        // F = heat rate into the domain through the boundaries + positive sources
+        scalar F = 0;
+        forAll(T.boundaryField(), patchi)
+        {
+            const fvPatchScalarField& Tp = T.boundaryField()[patchi];
+            F += sum(max(DT.boundaryField()[patchi]*Tp.snGrad()*Tp.patch().magSf(),
+                         scalar(0)));
+        }
+        const scalarField bV
+        (
+            tSource().diag()*T.primitiveField() - tSource().source()
+        );
+        F += sum(max(bV, scalar(0)));
+
+        const scalar eps = sum(mag(TEqn.residual()))/F;
+        Info<< "courseResidual: epsilon = " << eps << nl;
+
+        if (eps < resTol_)
+        {
+            const_cast<Time&>(mesh().time()).writeAndEnd();
+        }
+    #};
+}
