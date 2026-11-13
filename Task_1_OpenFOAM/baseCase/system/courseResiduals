@@ -24,6 +24,9 @@ FoamFile
 //  - Creates the fields q = -k grad(T) (heat flux vector in the cells) and
 //    qWall = -k dT/dn at the boundary faces (wall-normal heat flux out of the
 //    domain, from the temperature gradient just inside the boundary).
+//  - Wall-clock time [s] of the iterations after the first one (the first
+//    iteration includes compiling the source term code), to compare the
+//    run times of different solver settings.
 //
 // All heat rates are per unit depth (divided by the mesh thickness).
 // Written to the log file and to postProcessing/courseResiduals.dat.
@@ -46,6 +49,7 @@ courseResiduals
         #include "fvOptions.H"
         #include "OFstream.H"
         #include "emptyFvPatch.H"
+        #include "clockTime.H"
     #};
 
     codeOptions
@@ -66,6 +70,7 @@ courseResiduals
         autoPtr<OFstream> datFilePtr_;
         autoPtr<volVectorField> qPtr_;
         autoPtr<volScalarField> qWallPtr_;
+        clockTime clock_;
     #};
 
     codeRead
@@ -148,13 +153,15 @@ courseResiduals
                 new OFstream(runTime.path()/"postProcessing"/"courseResiduals.dat")
             );
             datFilePtr_() << "# iteration epsilon F Din Dout Sin Sout globalImbalance "
-                << "Q1 Q2 Q3 Q4 Qsource" << nl;
+                << "Q1 Q2 Q3 Q4 Qsource wallTime" << nl;
+            // Start the clock after the first iteration
+            clock_.resetTime();
         }
         datFilePtr_().precision(12);
         datFilePtr_() << runTime.timeIndex() << ' ' << eps << ' ' << F << ' '
             << Din << ' ' << Dout << ' ' << Sin << ' ' << Sout << ' '
             << imbalance << ' ' << Qb[1] << ' ' << Qb[2] << ' ' << Qb[3] << ' '
-            << Qb[4] << ' ' << sum(bV) << endl;
+            << Qb[4] << ' ' << sum(bV) << ' ' << clock_.elapsedTime() << endl;
 
         // Heat flux fields, written together with T
         if (!qPtr_)

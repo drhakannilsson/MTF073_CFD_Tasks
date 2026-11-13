@@ -193,8 +193,8 @@ class RunData:
         pp = os.path.join(self.run_dir, 'postProcessing')
         d = np.loadtxt(os.path.join(pp, 'courseResiduals.dat'), ndmin=2)
         names = ['iteration', 'epsilon', 'F', 'Din', 'Dout', 'Sin', 'Sout',
-                 'globalImbalance', 'Q1', 'Q2', 'Q3', 'Q4', 'Qsource']
-        self.hist = {n: d[:, k] for k, n in enumerate(names)}
+                 'globalImbalance', 'Q1', 'Q2', 'Q3', 'Q4', 'Qsource', 'wallTime']
+        self.hist = {n: d[:, k] for k, n in enumerate(names) if k < d.shape[1]}
 
         # Probes
         pf = sorted(glob.glob(os.path.join(pp, 'probes', '*', 'T')))
@@ -249,6 +249,7 @@ class RunData:
             'resTol': self.info['resTol'], 'nLinSolIter': self.info['nLinSolIter'],
             'openfoam': self.foam_version, 'converged': self.converged,
             'iterations': int(last['iteration']), 'epsilon': last['epsilon'],
+            'wallTime': last.get('wallTime', float('nan')),
             'F': last['F'], 'globalImbalance': last['globalImbalance'],
             'heatRates': {'boundary1': last['Q1'], 'boundary2': last['Q2'],
                           'boundary3': last['Q3'], 'boundary4': last['Q4'],

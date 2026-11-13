@@ -104,20 +104,22 @@ def write_case_page(outdir, case, run_items, comp, refs, errors, runs_root):
              '</div>')
     b.append(_fig(f"comparison/{comp['schematic']}", 'Domain and boundary conditions') + '</div>')
     b.append('<h3>Runs</h3><table><tr><th>Mesh</th><th>Cells</th><th>Status</th>'
-             '<th>&epsilon;</th><th>F [W/m]</th><th>Imbalance</th><th>T min / max [K]</th>'
+             '<th>Wall time [s]</th><th>&epsilon;</th><th>F [W/m]</th><th>Imbalance</th><th>T min / max [K]</th>'
              '<th>Files</th></tr>')
     for it in run_items:
         s = it['summary']
         mi = s['meshInfo']
         rd = os.path.relpath(it['run'].run_dir, outdir)
         b.append(f'<tr><td>{_e(s["mesh"])}</td><td class="num">{mi["nx"]} x {mi["ny"]}</td>'
-                 f'<td>{_status(s)}</td><td class="num">{s["epsilon"]:.3g}</td>'
+                 f'<td>{_status(s)}</td><td class="num">{s["wallTime"]:.3g}</td>'
+                 f'<td class="num">{s["epsilon"]:.3g}</td>'
                  f'<td class="num">{s["F"]:.6g}</td><td class="num">{s["globalImbalance"]:.3g}</td>'
                  f'<td class="num">{s["Tmin"]:.4g} / {s["Tmax"]:.4g}</td>'
                  f'<td><a href="{_e(s["mesh"])}/summary.txt">summary</a> · '
                  f'<a href="{_e(rd)}/log.laplacianFoam">log</a> · '
                  f'<a href="{_e(rd)}">case</a></td></tr>')
-    b.append('</table>')
+    b.append('</table><p class="muted">Wall time = wall-clock time of the iterations after the '
+             'first one (the first iteration includes compiling the source term code).</p>')
 
     # 3 Validation
     b.append('<h2 id="s3">3 Validation</h2>')

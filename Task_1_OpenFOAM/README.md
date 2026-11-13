@@ -162,9 +162,12 @@ depth:
   over the OpenFOAM matrix of the latest iteration,
 - F = Din + Sin, the total heat rate into the domain,
 - the heat rates through each boundary and from the source term,
-- the global imbalance |Din − Dout + Sin − Sout| / F.
+- the global imbalance |Din − Dout + Sin − Sout| / F,
+- the wall-clock time of the iterations after the first one (the first iteration
+  includes compiling the source term code), shown in the Runs table of the case page,
+  to compare the run times of different settings.
 
-It writes these to the log file and to `postProcessing/courseResiduals.dat`, and stops
+It writes these (except the wall-clock time) to the log file, and all of them to `postProcessing/courseResiduals.dat`, and stops
 the run when ε < resTol. It also creates the heat-flux fields `q = −k grad(T)` (in the
 cells) and `qWall = −k dT/dn` (at the boundary faces, out of the domain, from the
 temperature gradient just inside the boundary), which are written with T.
