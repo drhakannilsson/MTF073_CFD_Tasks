@@ -6,21 +6,7 @@ The scripts are described in detail in [Task_1_OpenFOAM/README.md](Task_1_OpenFO
 
 ## Step 1: Get the files
 
-In the **Ubuntu** terminal, download all files of the course project to your home directory:
-
-```
-cd
-git clone https://github.com/drhakannilsson/MTF073_CFD_Tasks.git
-```
-
-This creates the directory `~/MTF073_CFD_Tasks`. The scripts for Task 1 are in `~/MTF073_CFD_Tasks/Task_1_OpenFOAM`.
-
-When the files have been updated, get the latest version with:
-
-```
-cd ~/MTF073_CFD_Tasks
-git pull
-```
+Download the files of the course project as described in [README.md](README.md#get-the-files), if you have not already done so. The scripts for Task 1 are in `~/MTF073_CFD_Tasks/Task_1_OpenFOAM`.
 
 ## Step 2: Install the Python packages
 
