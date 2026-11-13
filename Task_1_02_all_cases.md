@@ -32,7 +32,15 @@ sudo apt install -y python3-numpy python3-matplotlib
 
 ## Step 3: Run a case
 
-In the **Ubuntu** terminal, set up, run and post-process case 5:
+In the **Ubuntu** terminal, first make sure that OpenFOAM is sourced (activated):
+
+```
+foamVersion
+```
+
+This should print `OpenFOAM-v2606`. It is automatic with the installation in [01_Install_OpenFOAM-v2606_WSL.md](01_Install_OpenFOAM-v2606_WSL.md).
+
+Then set up, run and post-process case 5:
 
 ```
 cd ~/MTF073_CFD_Tasks/Task_1_OpenFOAM
@@ -49,7 +57,7 @@ Run your own case by changing the number. Show all options with:
 
 ## Step 4: Look at the results
 
-In Windows File Explorer, go to `MTF073_CFD_Tasks\Task_1_OpenFOAM\results` in your Ubuntu home directory (see [01_Install_OpenFOAM-v2606_WSL.md](01_Install_OpenFOAM-v2606_WSL.md#find-your-linux-files-in-windows)), and double-click `index.html`. It opens in your web browser and links to the results of all post-processed cases.
+In Windows File Explorer, go to `MTF073_CFD_Tasks\Task_1_OpenFOAM\results` in your Ubuntu home directory (see [01_Install_OpenFOAM-v2606_WSL.md](01_Install_OpenFOAM-v2606_WSL.md#find-your-linux-files-in-windows)), and double-click `index.html`. It opens in your web browser, with a table of all post-processed cases. Click on a case, e.g. *Case 5*, to see its results. The case page has links at the top: *All cases* goes back to the table, and the others go to each section of the results (*1 Case*, *3 Validation*, *4–5 Results & convergence*, *5.1 Equi vs nonequi* and *6 Mesh study*). The section numbers are those of the Task 1 report template. When you run more cases, they are added to the table. If the page is already open in your web browser, reload it (F5) to see the new results.
 
 The OpenFOAM cases are in `Task_1_OpenFOAM/runs`, with one directory per case and mesh. Each of them has a `.foam` file, e.g. `runs/Case_05/nonequi_20x20/nonequi_20x20.foam`. Open it in ParaView as described in [02_Install_ParaView_Windows.md](02_Install_ParaView_Windows.md).
 

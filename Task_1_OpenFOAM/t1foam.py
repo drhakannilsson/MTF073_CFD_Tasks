@@ -373,7 +373,8 @@ def foam_prefix(args):
             raise SystemExit(f"Cannot find {bashrc}")
         return f'. "{bashrc}" > /dev/null 2>&1; '
     if not os.environ.get('WM_PROJECT_DIR'):
-        raise SystemExit("OpenFOAM is not sourced. Source its etc/bashrc, or use "
+        raise SystemExit("OpenFOAM is not activated in this terminal. Check with foamVersion "
+                         "(see 01_Install_OpenFOAM-v2606_WSL.md), or use "
                          "--foam /path/to/OpenFOAM-vXXXX")
     return ''
 
@@ -446,6 +447,8 @@ def main():
                 for n in cases for m in meshes]
 
     if not args.post_only:
+        # Check OpenFOAM before anything is set up (existing runs are overwritten)
+        version = None if args.setup_only else check_foam(args)
         existing = [d for d in run_dirs if os.path.exists(d)]
         if existing and not args.force:
             print(f"{len(existing)} run directories already exist and will be overwritten, e.g.\n"
@@ -461,7 +464,6 @@ def main():
                   "(with OpenFOAM sourced),\nor rerun this script without --setup-only.")
             return
 
-        version = check_foam(args)
         print(f"\nRunning {len(run_dirs)} simulation(s) with OpenFOAM-{version}, "
               f"{args.jobs} in parallel")
         with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, args.jobs)) as ex:
