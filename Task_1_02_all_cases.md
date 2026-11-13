@@ -33,7 +33,7 @@ cd ~/MTF073_CFD_Tasks/Task_1_OpenFOAM
 ./t1foam.py 5
 ```
 
-The case is run on four meshes. The first run takes a little longer, since some code is compiled.
+The case is run on four meshes. This takes a while, since each simulation first compiles some code.
 
 Run your own case by changing the number. Show all options with:
 

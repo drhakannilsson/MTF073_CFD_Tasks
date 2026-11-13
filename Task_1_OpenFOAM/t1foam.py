@@ -465,7 +465,8 @@ def main():
             return
 
         print(f"\nRunning {len(run_dirs)} simulation(s) with OpenFOAM-{version}, "
-              f"{args.jobs} in parallel")
+              f"{args.jobs} in parallel.\n"
+              "This takes a while, since each simulation first compiles some code.")
         with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, args.jobs)) as ex:
             futures = [ex.submit(run_case, d, args) for d in run_dirs]
             for fut in concurrent.futures.as_completed(futures):
