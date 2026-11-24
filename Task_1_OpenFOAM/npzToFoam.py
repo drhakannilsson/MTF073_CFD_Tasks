@@ -191,7 +191,7 @@ def write_polymesh(case_dir, x, y, thickness=DEFAULT_THICKNESS):
             f.write("\n".join(items))
             f.write("\n)\n")
 
-    write('points', 'vectorField', [f"({xx!r} {yy!r} {zz!r})" for xx, yy, zz in points])
+    write('points', 'vectorField', [f"({float(xx)!r} {float(yy)!r} {float(zz)!r})" for xx, yy, zz in points])
     write('faces', 'faceList', ["4({} {} {} {})".format(*f) for f in faces])
     write('owner', 'labelList', [str(c) for c in owner], with_note=True)
     write('neighbour', 'labelList', [str(c) for c in neighbour], with_note=True)
